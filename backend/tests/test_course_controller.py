@@ -66,6 +66,8 @@ async def test_update_course_con_campos_ejecuta_update():
 # ---------------------------------------------------------------------------
 async def test_delete_course_ejecuta_delete_con_id():
     db = AsyncMock()
+    db.fetchval.return_value = 0          # sin ofertas asociadas (BG-C4)
+    db.execute.return_value = "DELETE 1"  # se borró 1 fila (BG-C2)
 
     result = await courseController.delete_course(8, db)
 

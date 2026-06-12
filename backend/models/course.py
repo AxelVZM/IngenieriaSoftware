@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional
 from datetime import date
 
@@ -7,10 +7,24 @@ class CourseCreate(BaseModel):
     description: Optional[str] = None
     base_price: float
 
+    @field_validator("base_price")
+    @classmethod
+    def price_non_negative(cls, v):
+        if v < 0:
+            raise ValueError("El precio base no puede ser negativo")
+        return v
+
 class CourseUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     base_price: Optional[float] = None
+
+    @field_validator("base_price")
+    @classmethod
+    def price_non_negative(cls, v):
+        if v is not None and v < 0:
+            raise ValueError("El precio base no puede ser negativo")
+        return v
 
 class CourseOfferingCreate(BaseModel):
     course_id: int

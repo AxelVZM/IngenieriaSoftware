@@ -126,6 +126,8 @@ async def test_update_cycle_con_campos_ejecuta_update():
 # ---------------------------------------------------------------------------
 async def test_delete_cycle_ejecuta_delete_con_id():
     db = AsyncMock()
+    db.fetchval.return_value = 0          # sin ofertas asociadas (BG-C4)
+    db.execute.return_value = "DELETE 1"  # se borró 1 fila (BG-C2)
 
     result = await cycleController.delete_cycle(7, db)
 

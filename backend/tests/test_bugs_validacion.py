@@ -1,14 +1,10 @@
 """
-Pruebas que EVIDENCIAN defectos (Bitácora de errores - Bug Log)
-Estrategia Pressman, Cap. 17: "el éxito del testing se evidencia en el
-descubrimiento de defectos".
+Pruebas de REGRESIÓN de defectos corregidos (Bitácora de errores - Bug Log)
+Estrategia Pressman, Cap. 17.
 
-Estas pruebas describen el comportamiento CORRECTO esperado. Como el sistema
-todavía NO lo cumple, se marcan con @pytest.mark.xfail (fallo esperado):
-- Aparecen como 'xfailed' (amarillo), NO rompen el suite -> sigue en verde.
-- Cuando el bug se corrija, pasarán a 'xpassed', señalando que ya está resuelto.
-
-Mapea con la Bitácora de Errores: BG-C1, BG-C2, BG-C3.
+Estas pruebas describen el comportamiento CORRECTO. Antes fallaban (estaban marcadas
+xfail porque el sistema tenía los defectos BG-C1/C2/C3/C4); tras corregir los bugs,
+ahora PASAN, demostrando que las correcciones funcionan y evitando regresiones futuras.
 """
 import sys
 from pathlib import Path
@@ -17,23 +13,20 @@ from unittest.mock import AsyncMock
 
 import pytest
 from pydantic import ValidationError
+from fastapi import HTTPException
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import controllers.cycleController as cycleController
 import controllers.courseController as courseController
 from models.cycle import CycleCreate
 from models.course import CourseCreate
 
 
 # ---------------------------------------------------------------------------
-# BG-C1: create_cycle no valida que end_date > start_date
+# BG-C1: create_cycle ahora valida que end_date > start_date y duración > 0
 # ---------------------------------------------------------------------------
-@pytest.mark.xfail(
-    reason="BG-C1: el modelo no valida que la fecha de fin sea posterior a la de inicio",
-    strict=False,
-)
 def test_ciclo_rechaza_fecha_fin_anterior_a_inicio():
-    # Un ciclo con fin ANTES del inicio debería ser rechazado.
     with pytest.raises(ValidationError):
         CycleCreate(
             name="Ciclo inválido",
@@ -43,10 +36,6 @@ def test_ciclo_rechaza_fecha_fin_anterior_a_inicio():
         )
 
 
-@pytest.mark.xfail(
-    reason="BG-C1: el modelo no valida que duration_months sea > 0",
-    strict=False,
-)
 def test_ciclo_rechaza_duracion_no_positiva():
     with pytest.raises(ValidationError):
         CycleCreate(
@@ -57,31 +46,65 @@ def test_ciclo_rechaza_duracion_no_positiva():
         )
 
 
+def test_ciclo_valido_se_acepta():
+    # Caso de control: un ciclo coherente NO debe lanzar error.
+    c = CycleCreate(
+        name="Ciclo 2026-I",
+        start_date=date(2026, 3, 1),
+        end_date=date(2026, 7, 31),
+        duration_months=5,
+    )
+    assert c.duration_months == 5
+
+
 # ---------------------------------------------------------------------------
-# BG-C3: create_course acepta base_price negativo
+# BG-C3: create_course ahora rechaza base_price negativo
 # ---------------------------------------------------------------------------
-@pytest.mark.xfail(
-    reason="BG-C3: el modelo acepta precios negativos (no valida base_price >= 0)",
-    strict=False,
-)
 def test_curso_rechaza_precio_negativo():
     with pytest.raises(ValidationError):
         CourseCreate(name="Álgebra", base_price=-50.0)
 
 
+def test_curso_precio_valido_se_acepta():
+    c = CourseCreate(name="Álgebra", base_price=150.0)
+    assert c.base_price == 150.0
+
+
 # ---------------------------------------------------------------------------
-# BG-C2: delete_course no verifica existencia (falso positivo)
+# BG-C2: borrar un id inexistente ahora devuelve 404 (no un falso positivo)
 # ---------------------------------------------------------------------------
-@pytest.mark.xfail(
-    reason="BG-C2: borrar un id inexistente responde 'eliminado correctamente'",
-    strict=False,
-)
-async def test_delete_curso_inexistente_deberia_avisar_no_encontrado():
+async def test_delete_curso_inexistente_avisa_no_encontrado():
     db = AsyncMock()
-    # asyncpg devuelve el status del comando; 'DELETE 0' = ninguna fila borrada
-    db.execute.return_value = "DELETE 0"
+    db.fetchval.return_value = 0          # sin ofertas asociadas
+    db.execute.return_value = "DELETE 0"  # ninguna fila borrada
 
-    result = await courseController.delete_course(99999, db)
+    with pytest.raises(HTTPException) as exc:
+        await courseController.delete_course(99999, db)
 
-    # Lo correcto sería avisar que no existe, no confirmar el borrado.
-    assert "no encontrado" in result["message"].lower()
+    assert exc.value.status_code == 404
+    assert "no encontrado" in exc.value.detail.lower()
+
+
+# ---------------------------------------------------------------------------
+# BG-C4: no se puede borrar un ciclo/curso con dependencias (devuelve 409)
+# ---------------------------------------------------------------------------
+async def test_delete_ciclo_con_ofertas_es_bloqueado():
+    db = AsyncMock()
+    db.fetchval.return_value = 3  # el ciclo tiene 3 ofertas asociadas
+
+    with pytest.raises(HTTPException) as exc:
+        await cycleController.delete_cycle(1, db)
+
+    assert exc.value.status_code == 409
+    db.execute.assert_not_awaited()  # nunca llega a ejecutar el DELETE
+
+
+async def test_delete_curso_con_ofertas_es_bloqueado():
+    db = AsyncMock()
+    db.fetchval.return_value = 2  # el curso tiene 2 ofertas asociadas
+
+    with pytest.raises(HTTPException) as exc:
+        await courseController.delete_course(1, db)
+
+    assert exc.value.status_code == 409
+    db.execute.assert_not_awaited()
