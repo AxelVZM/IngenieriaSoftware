@@ -1,0 +1,20 @@
+# Node
+node_modules/
+npm-debug.log
+
+# Environment
+.env
+.env.local
+
+# Uploads
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+Paginas de Prueba/
+
+# OS
+.DS_Store
+Thumbs.db

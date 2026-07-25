@@ -1,0 +1,145 @@
+/* =========================================
+   ADMIN LAYOUT - SIDEBAR Y HEADER
+   Colores Institucionales: Negro, Gris, Blanco
+   ========================================= */
+
+/* ===== SIDEBAR (DRAWER) ===== */
+.admin-drawer {
+    background: linear-gradient(180deg, #000000 0%, #1a1a1a 100%) !important;
+}
+
+.admin-drawer .MuiDrawer-paper {
+    background: linear-gradient(180deg, #000000 0%, #1a1a1a 100%) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Header del Sidebar */
+.admin-drawer .MuiToolbar-root {
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    min-height: 64px !important;
+}
+
+.admin-drawer-title {
+    color: var(--white) !important;
+    font-weight: var(--font-bold) !important;
+    font-family: var(--font-secondary) !important;
+    font-size: var(--text-lg) !important;
+    letter-spacing: 0.5px;
+}
+
+/* Dividers */
+.admin-drawer .MuiDivider-root {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Menu Items */
+.admin-menu-item {
+    color: rgba(255, 255, 255, 0.7) !important;
+    transition: all var(--transition-base) !important;
+    margin: var(--space-1) var(--space-2) !important;
+    border-radius: var(--radius-md) !important;
+}
+
+.admin-menu-item:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: var(--white) !important;
+}
+
+.admin-menu-item.Mui-selected {
+    background: rgba(255, 255, 255, 0.15) !important;
+    color: var(--white) !important;
+    border-left: 3px solid var(--white);
+}
+
+.admin-menu-item.Mui-selected:hover {
+    background: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Menu Icons */
+.admin-menu-icon {
+    color: rgba(255, 255, 255, 0.7) !important;
+    min-width: 40px !important;
+}
+
+.admin-menu-item.Mui-selected .admin-menu-icon {
+    color: var(--white) !important;
+}
+
+.admin-menu-item:hover .admin-menu-icon {
+    color: var(--white) !important;
+}
+
+/* Menu Text */
+.admin-menu-text {
+    font-weight: var(--font-medium) !important;
+}
+
+.admin-menu-item.Mui-selected .admin-menu-text {
+    font-weight: var(--font-semibold) !important;
+}
+
+/* Logout Button */
+.admin-logout-item {
+    color: rgba(255, 255, 255, 0.7) !important;
+    margin: var(--space-1) var(--space-2) !important;
+    border-radius: var(--radius-md) !important;
+    transition: all var(--transition-base) !important;
+}
+
+.admin-logout-item:hover {
+    background: rgba(239, 68, 68, 0.2) !important;
+    color: #ef4444 !important;
+}
+
+.admin-logout-item:hover .admin-menu-icon {
+    color: #ef4444 !important;
+}
+
+/* ===== HEADER (APPBAR) ===== */
+.admin-appbar {
+    background: linear-gradient(135deg, #000000 0%, #2d2d2d 100%) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+.admin-appbar-title {
+    font-family: var(--font-secondary) !important;
+    font-weight: var(--font-semibold) !important;
+    color: var(--white) !important;
+    font-size: var(--text-lg) !important;
+}
+
+.admin-appbar-user {
+    color: rgba(255, 255, 255, 0.9) !important;
+    font-weight: var(--font-medium) !important;
+    background: rgba(255, 255, 255, 0.1);
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-full);
+    font-size: var(--text-sm) !important;
+}
+
+.admin-menu-button {
+    color: var(--white) !important;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .admin-drawer-title {
+        font-size: var(--text-base) !important;
+    }
+
+    .admin-appbar-title {
+        font-size: var(--text-base) !important;
+    }
+
+    .admin-appbar-user {
+        font-size: var(--text-xs) !important;
+        padding: var(--space-1) var(--space-3);
+    }
+}
+
+/* ===== MAIN CONTENT AREA ===== */
+.admin-main-content {
+    background-color: var(--admin-bg) !important;
+    min-height: calc(100vh - 64px);
+}
