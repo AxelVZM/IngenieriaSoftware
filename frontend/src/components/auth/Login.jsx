@@ -86,18 +86,32 @@ const ETIQUETAS = {
  * indican una sola vez encima del formulario y los fallos se agrupan en un
  * resumen junto al botón (defecto SEM-07). Aquí el campo solo se marca en rojo.
  */
-const Campo = ({ formik, name, placeholder, type = "text", fullWidth = false }) => {
+const Campo = ({
+  formik,
+  name,
+  placeholder,
+  type = "text",
+  fullWidth = false,
+  autoComplete,
+  numerico = false,
+}) => {
   const hayError = Boolean(
     (formik.touched[name] || formik.submitCount > 0) && formik.errors[name]
   );
 
   return (
     <div style={fullWidth ? { gridColumn: "1 / -1" } : undefined}>
+      {/* El marcador de posición desaparece al escribir, así que no sirve como
+          etiqueta para un lector de pantalla: se declara aparte (UX-04). */}
       <input
         type={type}
         placeholder={placeholder}
         name={name}
+        aria-label={placeholder}
         aria-invalid={hayError || undefined}
+        autoComplete={autoComplete}
+        /* Teclado numérico en el móvil para DNI y teléfonos (UX-05) */
+        inputMode={numerico ? "numeric" : undefined}
         {...formik.getFieldProps(name)}
         className={hayError ? "input-error" : ""}
       />
@@ -174,12 +188,18 @@ const Login = () => {
   const [datosPendientes, setDatosPendientes] = useState(null); // Registro en espera
   const [enviando, setEnviando] = useState(false);
 
-  // Función para mostrar notificaciones temporales
+  /**
+   * Muestra una notificación.
+   *
+   * Los avisos de éxito se retiran solos, pero los de error permanecen hasta
+   * que el usuario los cierra: un mensaje que se desvanece a los 4 segundos
+   * puede pasar inadvertido justo cuando más importa (defecto UX-02).
+   */
   const showNotification = (type, title, message) => {
     setNotification({ type, title, message });
-    setTimeout(() => {
-      setNotification(null);
-    }, 4000);
+    if (type === "success") {
+      setTimeout(() => setNotification(null), 4000);
+    }
   };
 
   useEffect(() => {
@@ -188,6 +208,18 @@ const Login = () => {
       setIsActive(true);
     }
   }, [location]);
+
+  // La tecla Escape cierra el modal de términos, como espera cualquier usuario
+  // acostumbrado a diálogos modales (defecto UX-03). Equivale a "No acepto":
+  // no se crea ninguna cuenta.
+  useEffect(() => {
+    if (!showRules) return;
+    const alPulsar = (e) => {
+      if (e.key === "Escape" && !enviando) handleRejectRules();
+    };
+    window.addEventListener("keydown", alPulsar);
+    return () => window.removeEventListener("keydown", alPulsar);
+  }, [showRules, enviando]);
 
   // Formulario de Login
   const loginFormik = useFormik({
@@ -297,6 +329,16 @@ const Login = () => {
               <h4>{notification.title}</h4>
               <p>{notification.message}</p>
             </div>
+            {notification.type !== "success" && (
+              <button
+                type="button"
+                className="notification-close"
+                aria-label="Cerrar aviso"
+                onClick={() => setNotification(null)}
+              >
+                ×
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -393,6 +435,7 @@ const Login = () => {
               formik={loginFormik}
               name="dni"
               placeholder="DNI o usuario"
+              autoComplete="username"
               fullWidth
             />
 
@@ -401,6 +444,7 @@ const Login = () => {
               name="password"
               type="password"
               placeholder="Contraseña"
+              autoComplete="current-password"
               fullWidth
             />
 
@@ -410,13 +454,12 @@ const Login = () => {
             {/* El DNI es también el usuario de acceso, y no hay recuperación
                 de contraseña: ambas cosas deben decirse (defecto SEM-08). */}
             <p className="field-note">
-              Los estudiantes ingresan con su DNI; docentes y administración,
-              con el usuario que les asignó la academia. Si olvidaste tu
-              contraseña, solicita una nueva en administración: el sistema no
-              permite restablecerla por tu cuenta.
+              Los estudiantes ingresan con su DNI.
             </p>
 
-            <button type="submit">Iniciar sesión</button>
+            <button type="submit" disabled={loginFormik.isSubmitting}>
+              {loginFormik.isSubmitting ? "Verificando…" : "Iniciar sesión"}
+            </button>
 
             {/* OPCIÓN: NO TENGO CUENTA */}
             <div className="switch-text-container">
@@ -441,31 +484,42 @@ const Login = () => {
             </p>
 
             <div className="form-grid">
-              <Campo formik={registerFormik} name="dni" placeholder="DNI" />
+              <Campo
+                formik={registerFormik}
+                name="dni"
+                placeholder="DNI"
+                autoComplete="username"
+                numerico
+              />
 
               <Campo
                 formik={registerFormik}
                 name="password"
                 type="password"
                 placeholder="Contraseña (mín. 8)"
+                autoComplete="new-password"
               />
 
               <Campo
                 formik={registerFormik}
                 name="first_name"
                 placeholder="Nombres"
+                autoComplete="given-name"
               />
 
               <Campo
                 formik={registerFormik}
                 name="last_name"
                 placeholder="Apellidos"
+                autoComplete="family-name"
               />
 
               <Campo
                 formik={registerFormik}
                 name="phone"
                 placeholder="Teléfono (9 dígitos)"
+                autoComplete="tel"
+                numerico
               />
 
               <Campo
@@ -478,6 +532,7 @@ const Login = () => {
                 formik={registerFormik}
                 name="parent_phone"
                 placeholder="Teléfono del apoderado (9 dígitos)"
+                numerico
                 fullWidth
               />
             </div>
