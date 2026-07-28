@@ -514,10 +514,7 @@ const Login = () => {
             {/* El DNI es también el usuario de acceso, y no hay recuperación
                 de contraseña: ambas cosas deben decirse (defecto SEM-08). */}
             <p className="field-note">
-              Los estudiantes ingresan con su DNI; docentes y administración,
-              con el usuario que les asignó la academia. Si olvidaste tu
-              contraseña, solicita una nueva en administración: el sistema no
-              permite restablecerla por tu cuenta.
+              Los estudiantes ingresan con su DNI.
             </p>
 
             <button type="submit" disabled={loginFormik.isSubmitting}>
