@@ -7,24 +7,61 @@ import { useAuth } from "../../contexts/AuthContext";
 import "./Auth.css";
 
 // Esquemas de validación
+// Esquemas de validación (alineados con la validación del backend)
 const loginSchema = yup.object({
-  dni: yup.string().required("El DNI es requerido"),
+  dni: yup.string().trim().required("El DNI es requerido"),
   password: yup.string().required("La contraseña es requerida"),
 });
 
 const registerSchema = yup.object({
   dni: yup
     .string()
-    .length(8, "DNI debe tener 8 dígitos")
+    .trim()
+    .matches(/^\d{8}$/, "El DNI debe tener exactamente 8 dígitos")
     .required("DNI requerido"),
-  first_name: yup.string().required("Nombre requerido"),
-  last_name: yup.string().required("Apellido requerido"),
-  phone: yup.string().required("Teléfono requerido"),
-  parent_name: yup.string().required("Nombre apoderado requerido"),
-  parent_phone: yup.string().required("Teléfono apoderado requerido"),
+  first_name: yup
+    .string()
+    .trim()
+    .min(2, "Mínimo 2 caracteres")
+    .matches(
+      /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' .-]+$/,
+      "Solo se permiten letras y espacios"
+    )
+    .required("Nombre requerido"),
+  last_name: yup
+    .string()
+    .trim()
+    .min(2, "Mínimo 2 caracteres")
+    .matches(
+      /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' .-]+$/,
+      "Solo se permiten letras y espacios"
+    )
+    .required("Apellido requerido"),
+  phone: yup
+    .string()
+    .trim()
+    .matches(/^9\d{8}$/, "Celular de 9 dígitos que empiece con 9")
+    .required("Teléfono requerido"),
+  parent_name: yup
+    .string()
+    .trim()
+    .min(2, "Mínimo 2 caracteres")
+    .matches(
+      /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' .-]+$/,
+      "Solo se permiten letras y espacios"
+    )
+    .required("Nombre apoderado requerido"),
+  parent_phone: yup
+    .string()
+    .trim()
+    .matches(/^9\d{8}$/, "Celular de 9 dígitos que empiece con 9")
+    .required("Teléfono apoderado requerido"),
   password: yup
     .string()
-    .min(6, "Mínimo 6 caracteres")
+    .min(8, "Mínimo 8 caracteres")
+    .max(72, "Máximo 72 caracteres")
+    .matches(/[A-Za-z]/, "Debe incluir al menos una letra")
+    .matches(/\d/, "Debe incluir al menos un número")
     .required("Contraseña requerida"),
 });
 
@@ -69,9 +106,15 @@ const Login = () => {
           else if (role === "teacher") navigate("/teacher/dashboard");
         }, 1000);
       } catch (err) {
+        // Mensaje especial cuando el backend bloquea por intentos fallidos
+        const titulo =
+          err.code === "TOO_MANY_ATTEMPTS"
+            ? "Cuenta bloqueada temporalmente"
+            : "Error de Acceso";
+
         showNotification(
           "error",
-          "Error de Acceso",
+          titulo,
           err.message || "Credenciales incorrectas"
         );
       }
@@ -93,14 +136,16 @@ const Login = () => {
     onSubmit: async (values) => {
       try {
         const { studentsAPI } = await import("../../services/api");
-        const data = await studentsAPI.register(values);
+        await studentsAPI.register(values);
 
         setShowRules(true);
         registerFormik.resetForm();
       } catch (err) {
         showNotification(
           "error",
-          "Error de Registro",
+          err.code === "DNI_ALREADY_REGISTERED"
+            ? "DNI ya registrado"
+            : "Error de Registro",
           err.message || "No se pudo crear la cuenta"
         );
       }

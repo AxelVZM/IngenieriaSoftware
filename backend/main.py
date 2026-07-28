@@ -1,27 +1,75 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from config.database import get_db_pool, close_db_pool
-from datetime import datetime
-import os
+"""
+Punto de entrada de la API.
 
-# Import routers
+Cambios respecto a la version revisada:
+  - Manejadores globales de excepciones: ninguna excepcion no controlada
+    llega al cliente como stacktrace.
+  - Formato de error unificado para HTTPException, errores de validacion
+    (422), errores de base de datos y errores 500.
+  - Se reemplaza @app.on_event (deprecado) por el gestor `lifespan`.
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+from contextlib import asynccontextmanager
+from datetime import datetime
+
+import asyncpg
+from fastapi import FastAPI, Request
+from fastapi.exceptions import HTTPException, RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from config.cloudinary import configure_cloudinary
+from config.database import close_db_pool, get_db_pool
+from utils.errors import DB_UNAVAILABLE_MESSAGE, GENERIC_SERVER_MESSAGE
+
+# Importar routers
 from routes import (
+    admin,
     auth,
-    students,
-    teachers,
     courses,
     cycles,
-    schedules,
     enrollments,
-    payments,
+    notifications,
     packages,
-    admin,
-    notifications
+    payments,
+    schedules,
+    students,
+    teachers,
 )
 
-app = FastAPI(title="Academia API", version="2.0.0")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+)
+logger = logging.getLogger("academia")
 
-# CORS - Agregar orígenes permitidos
+
+# ---------------------------------------------------------------------------
+# Ciclo de vida
+# ---------------------------------------------------------------------------
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await get_db_pool()
+    configure_cloudinary()
+    logger.info("Pool de base de datos creado y Cloudinary configurado")
+    yield
+    await close_db_pool()
+    logger.info("Pool de base de datos cerrado")
+
+
+app = FastAPI(title="Academia API", version="2.1.0", lifespan=lifespan)
+
+
+# ---------------------------------------------------------------------------
+# CORS
+# ---------------------------------------------------------------------------
+
 allowed_origins = [
     "http://localhost:3000",
     "http://localhost:5173",
@@ -29,27 +77,98 @@ allowed_origins = [
     "http://127.0.0.1:5173",
 ]
 
-# Si estás en producción, agregar el dominio del frontend
 frontend_url = os.getenv("FRONTEND_URL")
 if frontend_url:
-    allowed_origins.append(frontend_url)
-    # También agregar versión sin trailing slash si la tiene
-    if frontend_url.endswith("/"):
-        allowed_origins.append(frontend_url[:-1])
+    frontend_url = frontend_url.strip()
+    allowed_origins.append(frontend_url.rstrip("/"))
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=list(dict.fromkeys(allowed_origins)),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
 )
 
-# Configure Cloudinary
-from config.cloudinary import configure_cloudinary
-configure_cloudinary()
 
-# Include routers
+# ---------------------------------------------------------------------------
+# Manejadores globales de excepciones
+# ---------------------------------------------------------------------------
+
+
+def _error_body(code: str, message: str) -> dict:
+    return {"detail": {"code": code, "message": message}}
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """
+    Normaliza todas las HTTPException al formato {"detail": {code, message}}.
+
+    Acepta tanto las que ya vienen con el formato nuevo (dict) como las
+    antiguas que pasaban un string.
+    """
+    detail = exc.detail
+    if isinstance(detail, dict) and "message" in detail:
+        body = {"detail": detail}
+    else:
+        body = _error_body("HTTP_ERROR", str(detail))
+
+    return JSONResponse(
+        status_code=exc.status_code, content=body, headers=exc.headers
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Convierte los errores 422 de Pydantic en un mensaje legible."""
+    errores = []
+    for err in exc.errors():
+        campo = ".".join(str(p) for p in err.get("loc", []) if p not in ("body", "query"))
+        mensaje = err.get("msg", "valor invalido")
+        mensaje = mensaje.replace("Value error, ", "")
+        errores.append(f"{campo}: {mensaje}" if campo else mensaje)
+
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": {
+                "code": "VALIDATION_ERROR",
+                "message": " | ".join(errores) or "Datos invalidos.",
+                "fields": errores,
+            }
+        },
+    )
+
+
+@app.exception_handler(asyncpg.PostgresError)
+async def db_exception_handler(request: Request, exc: asyncpg.PostgresError):
+    """Cualquier error de PostgreSQL no capturado antes se vuelve un 503."""
+    logger.exception("Error de base de datos no controlado en %s", request.url.path)
+    return JSONResponse(
+        status_code=503,
+        content=_error_body("DB_UNAVAILABLE", DB_UNAVAILABLE_MESSAGE),
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """
+    Ultima red de seguridad: registra el error completo en el log del
+    servidor y devuelve un mensaje generico, sin stacktrace ni detalles
+    internos que puedan ayudar a un atacante.
+    """
+    logger.exception("Excepcion no controlada en %s", request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content=_error_body("INTERNAL_ERROR", GENERIC_SERVER_MESSAGE),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Routers
+# ---------------------------------------------------------------------------
+
 app.include_router(auth.router, prefix="/api")
 app.include_router(students.router, prefix="/api")
 app.include_router(teachers.router, prefix="/api")
@@ -62,37 +181,37 @@ app.include_router(packages.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
 
-@app.on_event("startup")
-async def startup():
-    await get_db_pool()
-    print("✓ Database pool created")
 
-@app.on_event("shutdown")
-async def shutdown():
-    await close_db_pool()
-    print("✓ Database pool closed")
+# ---------------------------------------------------------------------------
+# Endpoints de salud
+# ---------------------------------------------------------------------------
+
 
 @app.get("/")
 async def root():
-    return {"message": "Academia API v2.0 - FastAPI", "status": "running"}
+    return {"message": "Academia API v2.1 - FastAPI", "status": "running"}
+
 
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
+
 
 @app.get("/api/test")
 async def test_endpoint():
     return {
         "message": "Backend is running",
         "timestamp": datetime.now().isoformat(),
-        "status": "ok"
+        "status": "ok",
     }
+
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
-        "main:app", 
+        "main:app",
         host="0.0.0.0",
         port=int(os.getenv("PORT", "4000")),
-        reload=True
+        reload=True,
     )
