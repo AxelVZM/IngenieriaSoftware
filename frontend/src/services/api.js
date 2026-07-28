@@ -122,6 +122,20 @@ async function request(endpoint, options = {}) {
     throw error;
   }
 
+  // Red de seguridad para endpoints aún NO migrados al formato estándar.
+  // Algunos responden 200/201 pero con {"error": "..."} en el cuerpo, es decir,
+  // un fallo disfrazado de éxito (defecto BG-U1 en create_teacher). Sin esta
+  // comprobación la interfaz mostraría "creado correctamente" en un error.
+  // Cuando todos los controladores usen api_error(), este bloque sobra.
+  if (body && typeof body === "object" && typeof body.error === "string") {
+    const legacy = new ApiError(body.error, {
+      code: "LEGACY_ERROR",
+      status: response.status,
+    });
+    console.error("API Error (formato antiguo):", body.error);
+    throw legacy;
+  }
+
   return body;
 }
 
