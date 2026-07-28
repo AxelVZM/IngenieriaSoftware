@@ -1,5 +1,4 @@
 
-
 from __future__ import annotations
 
 from typing import Optional
@@ -28,10 +27,10 @@ def api_error(
 
 # Mensajes reutilizados: se centralizan para que no existan variantes que
 # revelen informacion distinta segun el caso (enumeracion de usuarios).
-GENERIC_CREDENTIALS_MESSAGE = "DNI o contrasena incorrectos. Intenta de nuevo."
+GENERIC_CREDENTIALS_MESSAGE = "DNI o contraseña incorrectos. Inténtalo de nuevo."
 GENERIC_SERVER_MESSAGE = (
-    "Ocurrio un error inesperado. Intenta nuevamente en unos momentos."
+    "Ocurrió un error inesperado. Inténtalo nuevamente en unos momentos."
 )
 DB_UNAVAILABLE_MESSAGE = (
-    "El servicio no esta disponible temporalmente. Intenta mas tarde."
+    "El servicio no está disponible temporalmente. Inténtalo más tarde."
 )

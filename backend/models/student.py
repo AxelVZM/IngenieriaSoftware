@@ -32,7 +32,7 @@ def _validar_dni(v: str) -> str:
     """Exige exactamente 8 digitos numericos."""
     v = v.strip()
     if not DNI_PATTERN.match(v):
-        raise ValueError("El DNI debe tener exactamente 8 digitos numericos")
+        raise ValueError("El DNI debe tener exactamente 8 dígitos numéricos")
     return v
 
 
@@ -43,7 +43,7 @@ def _validar_telefono(v: str) -> str:
         v = v[2:]
     if not PHONE_PATTERN.match(v):
         raise ValueError(
-            "El telefono debe tener 9 digitos y comenzar con 9 (celular peruano)"
+            "El teléfono debe tener 9 dígitos y empezar con 9 (celular peruano)"
         )
     return v
 
@@ -55,7 +55,7 @@ def _validar_nombre(v: str) -> str:
         raise ValueError("Debe tener al menos 2 caracteres")
     if not NAME_PATTERN.match(v):
         raise ValueError(
-            "Solo puede contener letras, espacios, apostrofes y guiones"
+            "Solo puede contener letras, espacios, apóstrofos y guiones"
         )
     return v.title()
 
@@ -65,13 +65,13 @@ def _validar_password(v: str) -> str:
     if len(v.encode("utf-8")) > 72:
         # bcrypt ignora todo lo que pase de 72 bytes: se rechaza para que el
         # usuario no crea que su contrasena es mas larga de lo que realmente es.
-        raise ValueError("La contrasena no puede superar los 72 bytes")
+        raise ValueError("La contraseña es demasiado larga (máximo 72 caracteres)")
     if v.strip() != v:
-        raise ValueError("La contrasena no puede empezar ni terminar con espacios")
+        raise ValueError("La contraseña no puede empezar ni terminar con espacios")
     if not re.search(r"[A-Za-z]", v):
-        raise ValueError("La contrasena debe incluir al menos una letra")
+        raise ValueError("La contraseña debe incluir al menos una letra")
     if not re.search(r"\d", v):
-        raise ValueError("La contrasena debe incluir al menos un numero")
+        raise ValueError("La contraseña debe incluir al menos un número")
     return v
 
 

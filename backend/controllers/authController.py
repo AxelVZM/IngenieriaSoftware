@@ -1,3 +1,14 @@
+"""
+Controlador de autenticacion.
+
+Cambios respecto a la version revisada:
+  1. Mensajes de error genericos en login -> ya no se puede saber si un DNI
+     existe (se elimina la enumeracion de usuarios).
+  2. Control de intentos fallidos por DNI + IP con bloqueo temporal.
+  3. Manejo explicito de errores de base de datos y de excepciones no
+     previstas: nunca se propaga un stacktrace al cliente.
+  4. Todas las respuestas de error usan el formato estandar de utils/errors.
+"""
 
 from __future__ import annotations
 
@@ -45,7 +56,7 @@ async def register_student(data: StudentCreate, db: asyncpg.Connection) -> dict:
             raise api_error(
                 409,
                 "DNI_ALREADY_REGISTERED",
-                "Este DNI ya se encuentra registrado. Inicia sesion o usa otro DNI.",
+                "Este DNI ya se encuentra registrado. Inicia sesión o usa otro DNI.",
             )
 
         password_hash = get_password_hash(data.password)
@@ -87,7 +98,7 @@ async def register_student(data: StudentCreate, db: asyncpg.Connection) -> dict:
         raise api_error(
             409,
             "DNI_ALREADY_REGISTERED",
-            "Este DNI ya se encuentra registrado. Inicia sesion o usa otro DNI.",
+            "Este DNI ya se encuentra registrado. Inicia sesión o usa otro DNI.",
         )
     except asyncpg.PostgresError:
         logger.exception("Error de base de datos durante el registro")
@@ -143,10 +154,11 @@ async def login_user(
     bloqueado = login_attempts.seconds_blocked(attempt_key)
     if bloqueado:
         minutos = max(1, bloqueado // 60)
+        unidad = "minuto" if minutos == 1 else "minutos"
         raise api_error(
             429,
             "TOO_MANY_ATTEMPTS",
-            f"Demasiados intentos fallidos. Vuelve a intentarlo en {minutos} minuto(s).",
+            f"Demasiados intentos fallidos. Vuelve a intentarlo en {minutos} {unidad}.",
             headers={"Retry-After": str(bloqueado)},
         )
 

@@ -134,7 +134,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={
             "detail": {
                 "code": "VALIDATION_ERROR",
-                "message": " | ".join(errores) or "Datos invalidos.",
+                "message": " | ".join(errores) or "Datos inválidos.",
                 "fields": errores,
             }
         },

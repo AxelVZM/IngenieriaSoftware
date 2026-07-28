@@ -1,3 +1,10 @@
+"""
+Middleware de autenticacion y autorizacion.
+
+`get_current_user` se debe aplicar con Depends() en TODAS las rutas
+protegidas del backend. La proteccion del frontend (ProtectedRoute) es solo
+de experiencia de usuario: no sustituye esta validacion.
+"""
 
 from __future__ import annotations
 
@@ -33,7 +40,7 @@ async def get_current_user(
     """
     if credentials is None or not credentials.credentials:
         raise api_error(
-            401, "TOKEN_MISSING", "Sesion no iniciada.", headers=_WWW_AUTH
+            401, "TOKEN_MISSING", "Sesión no iniciada. Inicia sesión para continuar.", headers=_WWW_AUTH
         )
 
     try:
@@ -42,12 +49,12 @@ async def get_current_user(
         raise api_error(
             401,
             "TOKEN_EXPIRED",
-            "Tu sesion ha expirado. Inicia sesion nuevamente.",
+            "Tu sesión ha expirado. Inicia sesión nuevamente.",
             headers=_WWW_AUTH,
         )
     except TokenInvalidError:
         raise api_error(
-            401, "TOKEN_INVALID", "Sesion invalida.", headers=_WWW_AUTH
+            401, "TOKEN_INVALID", "Sesión inválida. Inicia sesión nuevamente.", headers=_WWW_AUTH
         )
 
     user_id = payload["id"]
@@ -68,7 +75,7 @@ async def get_current_user(
             # Si el rol dice student pero no existe, no se sigue buscando en
             # users: eso permitiria escalar privilegios con un id coincidente.
             raise api_error(
-                401, "USER_NOT_FOUND", "La cuenta ya no existe.", headers=_WWW_AUTH
+                401, "USER_NOT_FOUND", "Esta cuenta ya no existe. Comunícate con la administración de la academia.", headers=_WWW_AUTH
             )
 
         user = await db.fetchrow(
@@ -81,7 +88,7 @@ async def get_current_user(
 
     if user is None:
         raise api_error(
-            401, "USER_NOT_FOUND", "La cuenta ya no existe.", headers=_WWW_AUTH
+            401, "USER_NOT_FOUND", "Esta cuenta ya no existe. Comunícate con la administración de la academia.", headers=_WWW_AUTH
         )
 
     # El rol autoritativo es el de la base de datos, no el del token: si a un
@@ -90,7 +97,7 @@ async def get_current_user(
         raise api_error(
             401,
             "TOKEN_INVALID",
-            "Tu sesion ya no es valida. Inicia sesion nuevamente.",
+            "Tu sesión ya no es válida. Inicia sesión nuevamente.",
             headers=_WWW_AUTH,
         )
 
@@ -112,7 +119,7 @@ def require_role(allowed_roles: list[str]):
             raise api_error(
                 403,
                 "FORBIDDEN",
-                "No tienes permisos para realizar esta accion.",
+                "No tienes permisos para realizar esta acción.",
             )
         return current_user
 
