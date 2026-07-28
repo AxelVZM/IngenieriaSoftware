@@ -17,6 +17,55 @@ const MSG_CREDENCIALES = "DNI o contraseña incorrectos. Inténtalo de nuevo.";
 
 const LETRAS = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' .-]+$/;
 
+/** Panel de inicio que corresponde a cada rol. */
+const RUTA_POR_ROL = {
+  admin: "/admin/dashboard",
+  student: "/student/dashboard",
+  teacher: "/teacher/dashboard",
+};
+
+/**
+ * Busca la sesión guardada sin depender del nombre exacto de la clave.
+ *
+ * Primero prueba los nombres habituales y, si no encuentra nada, recorre todo
+ * el almacenamiento local buscando un objeto que tenga un campo "role" con un
+ * rol conocido. Así funciona aunque AuthContext guarde la sesión con otro
+ * nombre, que era el punto frágil de la primera versión.
+ */
+const sesionGuardada = () => {
+  try {
+    if (!localStorage.getItem("token")) return null;
+
+    const candidatos = ["user", "usuario", "userData", "authUser", "currentUser"];
+    for (const clave of candidatos) {
+      const crudo = localStorage.getItem(clave);
+      if (!crudo) continue;
+      try {
+        const obj = JSON.parse(crudo);
+        if (obj?.role && RUTA_POR_ROL[obj.role]) return obj;
+      } catch {
+        /* no era JSON: se ignora */
+      }
+    }
+
+    // Último recurso: recorrer todas las claves buscando un objeto con rol.
+    for (const clave of Object.keys(localStorage)) {
+      const crudo = localStorage.getItem(clave);
+      if (!crudo || crudo[0] !== "{") continue;
+      try {
+        const obj = JSON.parse(crudo);
+        if (obj?.role && RUTA_POR_ROL[obj.role]) return obj;
+        if (obj?.user?.role && RUTA_POR_ROL[obj.user.role]) return obj.user;
+      } catch {
+        /* no era JSON: se ignora */
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
 // Esquemas de validación. Redacción homogénea y alineada con el backend
 // (defectos SIN-04, SIN-05, SIN-07 y SEM-04).
 const loginSchema = yup.object({
@@ -180,7 +229,7 @@ const ResumenErrores = ({ errores }) => {
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
+  const { login, user: usuarioContexto } = useAuth();
 
   const [isActive, setIsActive] = useState(false); // Toggle entre Login/Register
   const [showRules, setShowRules] = useState(false); // Modal de normas
@@ -202,11 +251,20 @@ const Login = () => {
     }
   };
 
+  // Quien ya tiene sesión no debe ver el formulario de acceso: se le lleva a
+  // su panel. Sin esto, pulsar Atrás tras iniciar sesión devolvía a /login y
+  // el usuario creía haberse desconectado (defecto NAV-04).
+  useEffect(() => {
+    // Se prioriza el usuario del contexto; si AuthContext no lo expone, se
+    // recurre al almacenamiento local.
+    const usuario = usuarioContexto?.role ? usuarioContexto : sesionGuardada();
+    const destino = usuario && RUTA_POR_ROL[usuario.role];
+    if (destino) navigate(destino, { replace: true });
+  }, [navigate, usuarioContexto]);
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (params.get("mode") === "register") {
-      setIsActive(true);
-    }
+    setIsActive(params.get("mode") === "register");
   }, [location]);
 
   // La tecla Escape cierra el modal de términos, como espera cualquier usuario
@@ -231,11 +289,13 @@ const Login = () => {
         showNotification("success", "¡Bienvenido!", "Iniciando sesión…");
 
         // Pequeño delay para ver la animación antes de redirigir
+        // replace: true evita que /login quede en el historial y que Atrás
+        // devuelva al formulario con la sesión ya iniciada (defecto NAV-04).
         setTimeout(() => {
-          const role = data.user.role;
-          if (role === "admin") navigate("/admin/dashboard");
-          else if (role === "student") navigate("/student/dashboard");
-          else if (role === "teacher") navigate("/teacher/dashboard");
+          const destino = RUTA_POR_ROL[data.user.role];
+          if (destino) navigate(destino, { replace: true });
+          else showNotification("error", "Rol no reconocido",
+            "Tu cuenta no tiene un panel asignado. Avisa a la administración.");
         }, 1000);
       } catch (err) {
         // El backend bloquea temporalmente tras varios intentos fallidos
@@ -454,7 +514,10 @@ const Login = () => {
             {/* El DNI es también el usuario de acceso, y no hay recuperación
                 de contraseña: ambas cosas deben decirse (defecto SEM-08). */}
             <p className="field-note">
-              Los estudiantes ingresan con su DNI.
+              Los estudiantes ingresan con su DNI; docentes y administración,
+              con el usuario que les asignó la academia. Si olvidaste tu
+              contraseña, solicita una nueva en administración: el sistema no
+              permite restablecerla por tu cuenta.
             </p>
 
             <button type="submit" disabled={loginFormik.isSubmitting}>
