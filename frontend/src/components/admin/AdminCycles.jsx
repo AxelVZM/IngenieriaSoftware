@@ -160,7 +160,7 @@ const AdminCycles = () => {
         </Button>
       </Box>
 
-      <TableContainer component={Paper} className="admin-table-container">
+      <TableContainer component={Paper} className="admin-table-container" sx={{ overflowX: 'auto' }}>
         <Table className="admin-table">
           <TableHead className="admin-table-head">
             <TableRow>
