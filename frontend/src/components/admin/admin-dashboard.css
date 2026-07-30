@@ -163,7 +163,13 @@
     box-shadow: var(--shadow-md) !important;
     border: 1px solid var(--admin-border) !important;
     border-top: none !important;
-    overflow: hidden !important;
+    /* El scroll horizontal debe vivir DENTRO del contenedor: la tabla tiene
+       min-width de 650px, así que en pantallas angostas se desborda. Con
+       "overflow: hidden" se desbordaba la página entera y se cortaban la barra
+       superior y los botones de acción. "auto" sigue recortando las esquinas
+       redondeadas y no agrega barra vertical, porque el alto lo define el
+       propio contenido. */
+    overflow: auto !important;
 }
 
 .admin-table {
@@ -352,8 +358,10 @@
         margin-bottom: var(--space-4);
     }
 
+    /* El scroll horizontal ya se declara en la regla base con !important, que
+       esta regla no podía sobreescribir. Se conserva por claridad. */
     .admin-table-container {
-        overflow-x: auto;
+        overflow-x: auto !important;
     }
 
     .admin-stat-number {
