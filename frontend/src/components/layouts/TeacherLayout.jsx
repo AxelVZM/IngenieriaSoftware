@@ -156,7 +156,11 @@ const TeacherLayout = () => {
         sx={{
           flexGrow: 1,
           p: 3,
-          width: { md: `calc(100% - ${drawerWidth}px)` },
+          // minWidth:0 permite que este flex item se encoja por debajo del ancho
+          // intrínseco de su contenido; sin él, una tabla ancha desborda todo el
+          // layout en lugar de desplazarse dentro de su propio contenedor.
+          minWidth: 0,
+          width: { xs: '100%', md: `calc(100% - ${drawerWidth}px)` },
           mt: 8,
         }}
       >
