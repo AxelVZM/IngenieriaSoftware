@@ -61,7 +61,12 @@ async def update_course(course_id: int, data: CourseUpdate, db: asyncpg.Connecti
 
     values.append(course_id)
     query = f"UPDATE courses SET {', '.join(fields)} WHERE id = ${idx}"
-    await db.execute(query, *values)
+    result = await db.execute(query, *values)
+
+    # Verificar que el curso realmente existía (mismo criterio que delete_course)
+    if int(result.split()[-1]) == 0:
+        raise HTTPException(status_code=404, detail="Curso no encontrado")
+
     return {"message": "Curso actualizado correctamente"}
 
 async def delete_course(course_id: int, db: asyncpg.Connection):
@@ -120,7 +125,12 @@ async def update_course_offering(offering_id: int, data: CourseOfferingUpdate, d
 
     values.append(offering_id)
     query = f"UPDATE course_offerings SET {', '.join(fields)} WHERE id = ${idx}"
-    await db.execute(query, *values)
+    result = await db.execute(query, *values)
+
+    # Verificar que la oferta realmente existía
+    if int(result.split()[-1]) == 0:
+        raise HTTPException(status_code=404, detail="Oferta no encontrada")
+
     return {"message": "Oferta actualizada correctamente"}
 
 async def delete_course_offering(offering_id: int, db: asyncpg.Connection):

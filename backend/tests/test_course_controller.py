@@ -51,6 +51,7 @@ async def test_update_course_sin_campos_no_ejecuta_query():
 
 async def test_update_course_con_campos_ejecuta_update():
     db = AsyncMock()
+    db.execute.return_value = "UPDATE 1"  # se actualizó 1 fila
 
     result = await courseController.update_course(5, CourseUpdate(base_price=200.0), db)
 
@@ -123,6 +124,7 @@ async def test_get_course_offerings_retorna_lista():
 # ---------------------------------------------------------------------------
 async def test_update_offering_con_campos_ejecuta_update():
     db = AsyncMock()
+    db.execute.return_value = "UPDATE 1"  # se actualizó 1 fila
 
     result = await courseController.update_course_offering(
         20, CourseOfferingUpdate(capacity=40), db

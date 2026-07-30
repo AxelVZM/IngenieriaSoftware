@@ -35,7 +35,13 @@ async def update_cycle(cycle_id: int, data: CycleUpdate, db: asyncpg.Connection)
 
     values.append(cycle_id)
     query = f"UPDATE cycles SET {', '.join(fields)} WHERE id = ${idx}"
-    await db.execute(query, *values)
+    result = await db.execute(query, *values)
+
+    # Verificar que el ciclo realmente existía: sin esto se respondía
+    # "actualizado correctamente" para cualquier id inexistente.
+    if int(result.split()[-1]) == 0:
+        raise HTTPException(status_code=404, detail="Ciclo no encontrado")
+
     return {"message": "Ciclo actualizado correctamente"}
 
 async def delete_cycle(cycle_id: int, db: asyncpg.Connection):

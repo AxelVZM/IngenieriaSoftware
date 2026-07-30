@@ -108,6 +108,7 @@ async def test_update_cycle_sin_campos_no_ejecuta_query():
 
 async def test_update_cycle_con_campos_ejecuta_update():
     db = AsyncMock()
+    db.execute.return_value = "UPDATE 1"  # se actualizó 1 fila
 
     data = CycleUpdate(status="closed")
 

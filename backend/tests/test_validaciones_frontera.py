@@ -22,7 +22,7 @@ from pydantic import ValidationError
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from models.cycle import CycleCreate
-from models.course import CourseCreate, CourseOfferingCreate
+from models.course import CourseCreate, CourseUpdate, CourseOfferingCreate
 
 
 # Rango de fechas coherente reutilizado por los casos de ciclo
@@ -62,16 +62,20 @@ def test_precio_minimo_positivo_es_aceptado():
     assert CourseCreate(name="Álgebra", base_price=0.01).base_price == 0.01
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="BG-C7: la matriz (SEM-02) afirma que un precio en CERO se rechaza, "
-           "pero el validador es 'v < 0', así que base_price=0 se acepta y "
-           "permite matricular un curso gratuito por error de tipeo.",
-)
-def test_precio_cero_debe_ser_rechazado():
-    """Valor límite ON-point: 0 no es un precio de venta legítimo."""
+def test_precio_cero_es_rechazado():
+    """Valor límite ON-point: 0 no es un precio de venta legítimo.
+
+    Regresión de DEF-03: el validador era 'v < 0', así que el cero pasaba y
+    permitía publicar un curso gratuito por un error de tipeo.
+    """
     with pytest.raises(ValidationError):
         CourseCreate(name="Álgebra", base_price=0)
+
+
+def test_precio_cero_es_rechazado_tambien_al_actualizar():
+    """DEF-03 afectaba igual a CourseUpdate: poner el precio en 0 al editar."""
+    with pytest.raises(ValidationError):
+        CourseUpdate(base_price=0)
 
 
 def test_precio_no_numerico_es_rechazado():

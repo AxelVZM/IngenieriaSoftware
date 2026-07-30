@@ -27,18 +27,13 @@ from models.course import CourseUpdate, CourseOfferingUpdate
 
 
 # ---------------------------------------------------------------------------
-# BG-C13: PUT sobre un id inexistente responde "actualizado correctamente"
+# Regresión de DEF-04: un PUT sobre un id inexistente respondía
+# "actualizado correctamente".
 #
-# BG-C2 arregló este falso positivo en los DELETE (comprobando el "DELETE 0"
-# que devuelve asyncpg), pero los UPDATE nunca revisan el "UPDATE 0".
+# BG-C2 ya había corregido este falso positivo en los DELETE (comprobando el
+# "DELETE 0" que devuelve asyncpg), pero los UPDATE no revisaban el "UPDATE 0".
 # ---------------------------------------------------------------------------
-@pytest.mark.xfail(
-    strict=True,
-    reason="BG-C13: update_cycle ignora el resultado 'UPDATE 0' de asyncpg y "
-           "responde éxito aunque el ciclo no exista (asimetría con BG-C2, ya "
-           "corregido en delete_cycle).",
-)
-async def test_update_cycle_inexistente_debe_devolver_404():
+async def test_update_cycle_inexistente_devuelve_404():
     db = AsyncMock()
     db.execute.return_value = "UPDATE 0"  # ninguna fila afectada
 
@@ -46,14 +41,10 @@ async def test_update_cycle_inexistente_debe_devolver_404():
         await cycleController.update_cycle(99999, CycleUpdate(name="Fantasma"), db)
 
     assert exc.value.status_code == 404
+    assert "no encontrado" in exc.value.detail.lower()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="BG-C13: mismo falso positivo en update_course; el frontend muestra "
-           "'Curso actualizado correctamente' sin que se haya tocado nada.",
-)
-async def test_update_course_inexistente_debe_devolver_404():
+async def test_update_course_inexistente_devuelve_404():
     db = AsyncMock()
     db.execute.return_value = "UPDATE 0"
 
@@ -61,13 +52,10 @@ async def test_update_course_inexistente_debe_devolver_404():
         await courseController.update_course(99999, CourseUpdate(base_price=1.0), db)
 
     assert exc.value.status_code == 404
+    assert "no encontrado" in exc.value.detail.lower()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="BG-C13: y también en update_course_offering.",
-)
-async def test_update_offering_inexistente_debe_devolver_404():
+async def test_update_offering_inexistente_devuelve_404():
     db = AsyncMock()
     db.execute.return_value = "UPDATE 0"
 
@@ -77,6 +65,7 @@ async def test_update_offering_inexistente_debe_devolver_404():
         )
 
     assert exc.value.status_code == 404
+    assert "no encontrada" in exc.value.detail.lower()
 
 
 # ---------------------------------------------------------------------------
