@@ -1,5 +1,5 @@
 """
-Rutas del Módulo de Matrículas — versión corregida.
+Rutas del Módulo de Matrículas — versión corregida
 
   R-01  /enrollments/by-offering estaba SIN autenticación: cualquiera podía
         obtener nombres, apellidos y DNI de todos los matriculados sin token.
