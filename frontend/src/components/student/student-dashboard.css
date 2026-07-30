@@ -1,0 +1,687 @@
+/* =========================================
+   STUDENT COMPONENTS - DISEÑO PREMIUM
+   Cards, Badges, Buttons y Estados Visuales
+   ========================================= */
+
+/* ===== CONTENEDOR PRINCIPAL ===== */
+.student-content {
+    position: relative;
+    z-index: 1;
+}
+
+/* ===== HEADERS Y TÍTULOS ===== */
+.student-page-title {
+    font-family: var(--font-secondary) !important;
+    font-weight: var(--font-bold) !important;
+    color: var(--gray-900) !important;
+    font-size: var(--text-3xl) !important;
+    margin-bottom: var(--space-6) !important;
+    position: relative;
+    display: inline-block;
+}
+
+.student-page-title::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 0;
+    width: 60px;
+    height: 4px;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    border-radius: 2px;
+}
+
+.student-section-title {
+    font-family: var(--font-secondary) !important;
+    font-weight: var(--font-semibold) !important;
+    color: var(--gray-800) !important;
+    font-size: var(--text-2xl) !important;
+    margin-bottom: var(--space-4) !important;
+    margin-top: var(--space-6) !important;
+}
+
+/* ===== CARDS PREMIUM ===== */
+.student-card {
+    background: var(--white) !important;
+    border-radius: var(--radius-xl) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+    border: 1px solid rgba(0, 0, 0, 0.06) !important;
+    transition: all var(--transition-base) !important;
+    overflow: hidden;
+    position: relative;
+}
+
+.student-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    opacity: 0;
+    transition: opacity var(--transition-base);
+}
+
+.student-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(102, 126, 234, 0.2) !important;
+}
+
+.student-card:hover::before {
+    opacity: 1;
+}
+
+/* Card seleccionada */
+.student-card.selected {
+    border-color: #667eea !important;
+    box-shadow: 0 8px 16px rgba(102, 126, 234, 0.25) !important;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.02) 0%, rgba(118, 75, 162, 0.02) 100%) !important;
+}
+
+.student-card.selected::before {
+    opacity: 1;
+    height: 4px;
+}
+
+/* ===== BADGES Y CHIPS ===== */
+.student-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-full);
+    font-size: var(--text-xs) !important;
+    font-weight: var(--font-semibold) !important;
+    font-family: var(--font-primary) !important;
+    letter-spacing: 0.3px;
+    transition: all var(--transition-base);
+}
+
+/* Estados de badges */
+.student-badge.available {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: var(--white);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.student-badge.selected {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: var(--white);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.student-badge.enrolled {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: var(--white);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.student-badge.pending {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: var(--white);
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+}
+
+.student-badge.approved {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: var(--white);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.student-badge.rejected {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: var(--white);
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+
+.student-badge.default {
+    background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+    color: var(--white);
+    box-shadow: 0 2px 8px rgba(107, 114, 128, 0.3);
+}
+
+/* ===== BOTONES PREMIUM ===== */
+.student-btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: var(--white) !important;
+    font-weight: var(--font-semibold) !important;
+    font-family: var(--font-primary) !important;
+    padding: var(--space-3) var(--space-6) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3) !important;
+    border: none !important;
+    transition: all var(--transition-base) !important;
+    text-transform: none !important;
+}
+
+.student-btn-primary:hover {
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4) !important;
+    transform: translateY(-2px);
+}
+
+.student-btn-secondary {
+    background: var(--white) !important;
+    color: #667eea !important;
+    font-weight: var(--font-semibold) !important;
+    font-family: var(--font-primary) !important;
+    padding: var(--space-3) var(--space-6) !important;
+    border-radius: var(--radius-lg) !important;
+    border: 2px solid #667eea !important;
+    transition: all var(--transition-base) !important;
+    text-transform: none !important;
+}
+
+.student-btn-secondary:hover {
+    background: rgba(102, 126, 234, 0.1) !important;
+    transform: translateY(-2px);
+}
+
+.student-btn-remove {
+    background: var(--white) !important;
+    color: #ef4444 !important;
+    font-weight: var(--font-semibold) !important;
+    font-family: var(--font-primary) !important;
+    padding: var(--space-2) var(--space-4) !important;
+    border-radius: var(--radius-md) !important;
+    border: 2px solid #ef4444 !important;
+    transition: all var(--transition-base) !important;
+    text-transform: none !important;
+}
+
+.student-btn-remove:hover {
+    background: rgba(239, 68, 68, 0.1) !important;
+    transform: translateY(-2px);
+}
+
+/* ===== PRICE DISPLAY ===== */
+.student-price {
+    font-family: var(--font-secondary) !important;
+    font-weight: var(--font-bold) !important;
+    font-size: var(--text-xl) !important;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* ===== SUMMARY BOX (Sticky Footer) ===== */
+.student-summary-box {
+    position: sticky !important;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(16px);
+    padding: var(--space-4) var(--space-6) !important;
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.1) !important;
+    border-top: 2px solid rgba(102, 126, 234, 0.2);
+    z-index: 100;
+    margin-top: var(--space-8) !important;
+}
+
+.student-summary-total {
+    font-family: var(--font-secondary) !important;
+    font-weight: var(--font-bold) !important;
+    font-size: var(--text-2xl) !important;
+    color: var(--gray-900) !important;
+}
+
+/* ===== ENROLLMENT STATUS CARDS ===== */
+.student-enrollment-card {
+    position: relative;
+    border-left: 4px solid transparent;
+    transition: all var(--transition-base);
+}
+
+.student-enrollment-card.pending {
+    border-left-color: #f59e0b;
+    background: linear-gradient(90deg, rgba(245, 158, 11, 0.03) 0%, transparent 100%) !important;
+}
+
+.student-enrollment-card.approved {
+    border-left-color: #10b981;
+    background: linear-gradient(90deg, rgba(16, 185, 129, 0.03) 0%, transparent 100%) !important;
+}
+
+.student-enrollment-card.rejected {
+    border-left-color: #ef4444;
+    background: linear-gradient(90deg, rgba(239, 68, 68, 0.03) 0%, transparent 100%) !important;
+}
+
+/* ===== DIALOG STYLES ===== */
+.student-dialog-title {
+    font-family: var(--font-secondary) !important;
+    font-weight: var(--font-bold) !important;
+    color: var(--gray-900) !important;
+    border-bottom: 2px solid rgba(102, 126, 234, 0.2);
+    padding-bottom: var(--space-3) !important;
+}
+
+.student-dialog-content {
+    padding: var(--space-6) !important;
+}
+
+/* ===== SCHEDULE PREVIEW ===== */
+.student-schedule-item {
+    background: var(--gray-50);
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-2);
+    border-left: 3px solid #667eea;
+    transition: all var(--transition-base);
+}
+
+.student-schedule-item:hover {
+    background: var(--gray-100);
+    transform: translateX(4px);
+}
+
+/* ===== INFO BOXES ===== */
+.student-info-box {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+    border: 1px dashed rgba(102, 126, 234, 0.3);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    margin: var(--space-4) 0;
+}
+
+.student-info-box-title {
+    font-weight: var(--font-semibold) !important;
+    color: var(--gray-800) !important;
+    margin-bottom: var(--space-2) !important;
+}
+
+/* ===== ALERTS ===== */
+.student-alert {
+    border-radius: var(--radius-lg) !important;
+    padding: var(--space-4) !important;
+    margin-bottom: var(--space-4) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* ===== LOADING STATES ===== */
+.student-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+}
+
+.student-loading-spinner {
+    color: #667eea !important;
+}
+
+/* ===== EMPTY STATES ===== */
+.student-empty-state {
+    text-align: center;
+    padding: var(--space-12) var(--space-6);
+    color: var(--gray-500);
+}
+
+.student-empty-state-icon {
+    font-size: 64px !important;
+    color: var(--gray-300);
+    margin-bottom: var(--space-4);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .student-page-title {
+        font-size: var(--text-2xl) !important;
+    }
+
+    .student-section-title {
+        font-size: var(--text-xl) !important;
+    }
+
+    .student-summary-box {
+        padding: var(--space-3) var(--space-4) !important;
+    }
+
+    .student-btn-primary,
+    .student-btn-secondary {
+        padding: var(--space-2) var(--space-4) !important;
+        font-size: var(--text-sm) !important;
+    }
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.student-card {
+    animation: slideInUp var(--transition-base) ease;
+}
+
+/* Stagger animation for cards */
+.student-card:nth-child(1) {
+    animation-delay: 0ms;
+}
+
+.student-card:nth-child(2) {
+    animation-delay: 50ms;
+}
+
+.student-card:nth-child(3) {
+    animation-delay: 100ms;
+}
+
+.student-card:nth-child(4) {
+    animation-delay: 150ms;
+}
+
+.student-card:nth-child(5) {
+    animation-delay: 200ms;
+}
+
+.student-card:nth-child(6) {
+    animation-delay: 250ms;
+}
+
+/* =========================================
+   DASHBOARD ESTUDIANTE - ESTILOS MEJORADOS
+   ========================================= */
+
+.fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+/* 1. WELCOME BANNER */
+.student-welcome-card {
+    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+    /* Negro premium */
+    color: white;
+    padding: var(--space-8);
+    border-radius: var(--radius-xl);
+    margin-bottom: var(--space-8);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.student-welcome-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -10%;
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle, rgba(102, 126, 234, 0.2) 0%, transparent 70%);
+    border-radius: 50%;
+}
+
+.welcome-date {
+    text-transform: capitalize;
+    opacity: 0.7;
+    margin-bottom: var(--space-2) !important;
+    font-size: 0.9rem;
+}
+
+.welcome-title {
+    font-weight: 800 !important;
+    margin-bottom: var(--space-2) !important;
+    background: linear-gradient(90deg, #fff, #e2e8f0);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.welcome-subtitle {
+    opacity: 0.9;
+    font-size: 1.1rem;
+}
+
+.welcome-icon-container {
+    display: none;
+    /* Oculto en móvil */
+}
+
+@media (min-width: 768px) {
+    .welcome-icon-container {
+        display: block;
+        transform: rotate(-15deg);
+    }
+}
+
+/* 2. STAT CARDS (KPIs) */
+.student-stat-card {
+    border: none !important;
+    border-radius: var(--radius-xl) !important;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02) !important;
+    transition: transform 0.3s ease, box-shadow 0.3s ease !important;
+    position: relative;
+    overflow: hidden;
+    background: white !important;
+}
+
+.student-stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Bordes inferiores de color */
+.student-stat-card.primary {
+    border-bottom: 4px solid #667eea !important;
+}
+
+.student-stat-card.success {
+    border-bottom: 4px solid #10b981 !important;
+}
+
+.student-stat-card.warning {
+    border-bottom: 4px solid #f59e0b !important;
+}
+
+.stat-icon-bg {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px !important;
+}
+
+.stat-icon-bg.primary {
+    background: rgba(102, 126, 234, 0.1);
+    color: #667eea;
+}
+
+.stat-icon-bg.success {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+}
+
+.stat-icon-bg.warning {
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+}
+
+
+/* 3. ACTION CARDS */
+.section-header {
+    font-weight: 700 !important;
+    color: var(--gray-800);
+    margin-bottom: var(--space-4) !important;
+    font-family: var(--font-secondary) !important;
+}
+
+.action-card {
+    border-radius: var(--radius-lg) !important;
+    border: 1px solid var(--gray-200) !important;
+    cursor: pointer;
+    transition: all 0.2s ease !important;
+    background: white !important;
+    margin-bottom: var(--space-3);
+}
+
+.action-card:hover {
+    border-color: #667eea !important;
+    background: linear-gradient(to right, #fff, #f8fafc) !important;
+    transform: translateX(5px);
+}
+
+.action-button {
+    background: var(--gray-100) !important;
+    color: var(--gray-600) !important;
+    transition: all 0.2s !important;
+}
+
+.action-card:hover .action-button {
+    background: #667eea !important;
+    color: white !important;
+}
+
+.mt-2 {
+    margin-top: var(--space-3);
+}
+
+/* 4. HORIZONTAL LIST CARDS */
+.horizontal-card {
+    border: 1px solid var(--gray-100) !important;
+    box-shadow: none !important;
+}
+
+.horizontal-card:hover {
+    border-color: var(--gray-300) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+}
+
+.student-price-small {
+    font-weight: 700;
+    color: #4b5563;
+}
+
+.empty-state-box {
+    background: white;
+    border-radius: var(--radius-lg);
+    border: 2px dashed var(--gray-200);
+    padding: var(--space-8);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* =========================================
+   CATÁLOGO DE CURSOS (Available Courses)
+   ========================================= */
+
+/* Filtros Chips */
+.filter-chip {
+    background-color: #f1f5f9 !important;
+    border: 1px solid transparent !important;
+    font-weight: 500 !important;
+    transition: all 0.2s ease !important;
+}
+
+.filter-chip:hover {
+    background-color: #e2e8f0 !important;
+}
+
+.filter-chip.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: white !important;
+    box-shadow: 0 4px 10px rgba(102, 126, 234, 0.3);
+}
+
+/* Tabs personalizadas */
+.student-tabs .MuiTab-root {
+    text-transform: none !important;
+    font-weight: 600 !important;
+    font-size: 1rem !important;
+    min-height: 48px;
+}
+
+.student-tabs .Mui-selected {
+    color: #667eea !important;
+}
+
+.student-tabs .MuiTabs-indicator {
+    background-color: #667eea !important;
+    height: 3px !important;
+    border-radius: 3px 3px 0 0;
+}
+
+/* Tarjeta de Curso Específica */
+.course-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.course-card-title {
+    font-weight: 700 !important;
+    line-height: 1.3 !important;
+    margin-bottom: 8px !important;
+    min-height: 42px;
+    /* Alineación vertical para títulos de 2 líneas */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.course-card-desc {
+    color: #64748b;
+    font-size: 0.875rem !important;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-bottom: auto !important;
+    /* Empuja el contenido inferior hacia abajo */
+}
+
+/* Estado Vacío de Búsqueda */
+.empty-search-state {
+    text-align: center;
+    padding: 60px 20px;
+    background: #f8fafc;
+    border-radius: 16px;
+    border: 2px dashed #cbd5e1;
+}
+
+/* Dialogo de Confirmación */
+.confirm-item-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background-color: #fff;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.schedules-preview-box {
+    background-color: #f8fafc;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+/* Animación slide up para el footer */
+.slide-up {
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}

@@ -1,0 +1,419 @@
+/* =========================================
+   TEACHER DASHBOARD - ESTILOS MODERNOS
+   Colores Institucionales: Negro, Gris, Blanco
+   ========================================= */
+
+/* ===== VARIABLES PARA TEACHER ===== */
+:root {
+    /* Colores del Dashboard del Docente */
+    --teacher-bg: #f5f5f5;
+    --teacher-card-bg: #ffffff;
+    --teacher-header-bg: linear-gradient(135deg, #000000 0%, #2d2d2d 100%);
+    --teacher-text-primary: #1a1a1a;
+    --teacher-text-secondary: #6b7280;
+    --teacher-border: #e5e7eb;
+    --teacher-hover: #f9fafb;
+
+    /* Estados */
+    --status-success: #10b981;
+    --status-success-light: #d1fae5;
+    --status-warning: #f59e0b;
+    --status-warning-light: #fef3c7;
+    --status-danger: #ef4444;
+    --status-danger-light: #fee2e2;
+    --status-info: #3b82f6;
+    --status-info-light: #dbeafe;
+    --status-pending: #6b7280;
+    --status-pending-light: #f3f4f6;
+}
+
+/* ===== LAYOUT PRINCIPAL ===== */
+.teacher-dashboard {
+    background-color: var(--teacher-bg);
+    min-height: 100vh;
+    padding: var(--space-8);
+}
+
+.teacher-dashboard-title {
+    font-family: var(--font-secondary);
+    font-size: var(--text-4xl);
+    font-weight: var(--font-black);
+    color: var(--teacher-text-primary);
+    margin-bottom: var(--space-6);
+    background: var(--teacher-header-bg);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.teacher-subtitle {
+    font-size: var(--text-lg);
+    color: var(--teacher-text-secondary);
+    margin-bottom: var(--space-6);
+    font-weight: var(--font-medium);
+}
+
+/* ===== CARDS DE ESTADÍSTICAS ===== */
+.teacher-stat-card {
+    background: var(--white) !important;
+    border-radius: var(--radius-xl) !important;
+    box-shadow: var(--shadow-md) !important;
+    border: 1px solid var(--teacher-border) !important;
+    transition: all var(--transition-base) !important;
+    overflow: hidden !important;
+    position: relative !important;
+}
+
+.teacher-stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--teacher-header-bg);
+}
+
+.teacher-stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-xl) !important;
+}
+
+.teacher-stat-icon {
+    width: 60px !important;
+    height: 60px !important;
+    border-radius: var(--radius-lg) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin-right: var(--space-4) !important;
+}
+
+.teacher-stat-icon.primary {
+    background: linear-gradient(135deg, #000000 0%, #2d2d2d 100%);
+}
+
+.teacher-stat-icon.success {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.teacher-stat-icon.warning {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+.teacher-stat-icon.danger {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+.teacher-stat-icon.info {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+
+.teacher-stat-number {
+    font-size: var(--text-4xl) !important;
+    font-weight: var(--font-black) !important;
+    font-family: var(--font-secondary) !important;
+    color: var(--teacher-text-primary) !important;
+    line-height: 1 !important;
+}
+
+.teacher-stat-label {
+    font-size: var(--text-sm) !important;
+    color: var(--teacher-text-secondary) !important;
+    font-weight: var(--font-medium) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+}
+
+/* ===== TABLAS ESTILIZADAS ===== */
+.teacher-table-container {
+    background: var(--white) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: var(--shadow-md) !important;
+    border: 1px solid var(--teacher-border) !important;
+    overflow: hidden !important;
+    margin-top: var(--space-6) !important;
+}
+
+.teacher-table {
+    min-width: 650px !important;
+}
+
+.teacher-table-head {
+    background: var(--teacher-header-bg) !important;
+}
+
+.teacher-table-head-cell {
+    color: var(--white) !important;
+    font-weight: var(--font-bold) !important;
+    font-family: var(--font-secondary) !important;
+    text-transform: uppercase !important;
+    font-size: var(--text-xs) !important;
+    letter-spacing: 0.5px !important;
+    padding: var(--space-4) var(--space-4) !important;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.teacher-table-row {
+    transition: all var(--transition-fast) !important;
+}
+
+.teacher-table-row:nth-of-type(even) {
+    background-color: var(--gray-50) !important;
+}
+
+.teacher-table-row:hover {
+    background-color: var(--teacher-hover) !important;
+    transform: scale(1.001);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+}
+
+.teacher-table-cell {
+    padding: var(--space-4) var(--space-4) !important;
+    font-size: var(--text-sm) !important;
+    color: var(--teacher-text-primary) !important;
+    border-bottom: 1px solid var(--teacher-border) !important;
+}
+
+/* ===== LOADING STATE ===== */
+.teacher-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+}
+
+/* ===== EMPTY STATE ===== */
+.teacher-empty-state {
+    padding: var(--space-12) var(--space-8) !important;
+    text-align: center !important;
+    background: var(--white) !important;
+}
+
+.teacher-empty-state-text {
+    color: var(--teacher-text-secondary) !important;
+    font-size: var(--text-lg) !important;
+    font-weight: var(--font-medium) !important;
+}
+
+/* ===== ALERTS ===== */
+.teacher-alert {
+    border-radius: var(--radius-lg) !important;
+    margin-bottom: var(--space-4) !important;
+    box-shadow: var(--shadow-sm) !important;
+}
+
+.teacher-alert-card {
+    background: var(--white) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: var(--shadow-md) !important;
+    padding: var(--space-4) !important;
+    margin-bottom: var(--space-4) !important;
+    border-left: 4px solid var(--status-danger) !important;
+}
+
+.teacher-alert-card.success {
+    border-left-color: var(--status-success) !important;
+}
+
+.teacher-alert-card.warning {
+    border-left-color: var(--status-warning) !important;
+}
+
+.teacher-alert-card.info {
+    border-left-color: var(--status-info) !important;
+}
+
+/* ===== BOTONES DE ACCIÓN ===== */
+.teacher-button {
+    border-radius: var(--radius-lg) !important;
+    padding: var(--space-3) var(--space-6) !important;
+    font-weight: var(--font-semibold) !important;
+    text-transform: none !important;
+    transition: all var(--transition-base) !important;
+    box-shadow: var(--shadow-sm) !important;
+}
+
+.teacher-button-primary {
+    background: var(--teacher-header-bg) !important;
+    color: var(--white) !important;
+}
+
+.teacher-button-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg) !important;
+    filter: brightness(1.2);
+}
+
+.teacher-button-secondary {
+    background: transparent !important;
+    color: var(--black) !important;
+    border: 2px solid var(--black) !important;
+}
+
+.teacher-button-secondary:hover {
+    background: var(--black) !important;
+    color: var(--white) !important;
+}
+
+/* ===== CHIPS/BADGES MEJORADOS ===== */
+.teacher-chip {
+    font-weight: var(--font-semibold) !important;
+    font-size: var(--text-xs) !important;
+    border-radius: var(--radius-md) !important;
+    padding: var(--space-1) var(--space-3) !important;
+    text-transform: capitalize !important;
+}
+
+.teacher-chip.success {
+    background-color: var(--status-success-light) !important;
+    color: var(--status-success) !important;
+    border: 1px solid var(--status-success) !important;
+}
+
+.teacher-chip.warning {
+    background-color: var(--status-warning-light) !important;
+    color: var(--status-warning) !important;
+    border: 1px solid var(--status-warning) !important;
+}
+
+.teacher-chip.error {
+    background-color: var(--status-danger-light) !important;
+    color: var(--status-danger) !important;
+    border: 1px solid var(--status-danger) !important;
+}
+
+.teacher-chip.info {
+    background-color: var(--status-info-light) !important;
+    color: var(--status-info) !important;
+    border: 1px solid var(--status-info) !important;
+}
+
+.teacher-chip.default {
+    background-color: var(--status-pending-light) !important;
+    color: var(--status-pending) !important;
+    border: 1px solid var(--status-pending) !important;
+}
+
+/* ===== DIALOG STYLES ===== */
+.teacher-dialog .MuiDialogTitle-root {
+    background: var(--teacher-header-bg);
+    color: var(--white) !important;
+    font-weight: var(--font-bold) !important;
+    font-family: var(--font-secondary) !important;
+}
+
+.teacher-dialog .MuiDialogContent-root {
+    padding: var(--space-6) !important;
+}
+
+.teacher-dialog .MuiDialogActions-root {
+    padding: var(--space-4) var(--space-6) !important;
+    border-top: 1px solid var(--teacher-border);
+}
+
+/* ===== FORMULARIOS ===== */
+.teacher-input {
+    border-radius: var(--radius-md) !important;
+}
+
+.teacher-input .MuiOutlinedInput-root {
+    border-radius: var(--radius-md) !important;
+}
+
+.teacher-input .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+    border-color: var(--black) !important;
+}
+
+.teacher-input .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+    border-color: var(--black) !important;
+    border-width: 2px !important;
+}
+
+/* ===== ICON BUTTONS ===== */
+.teacher-icon-button {
+    transition: all var(--transition-base) !important;
+    margin: 0 var(--space-1) !important;
+}
+
+.teacher-icon-button:hover {
+    transform: scale(1.1);
+    background: rgba(0, 0, 0, 0.05) !important;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .teacher-dashboard {
+        padding: var(--space-4);
+    }
+
+    .teacher-dashboard-title {
+        font-size: var(--text-3xl);
+    }
+
+    .teacher-stat-card {
+        margin-bottom: var(--space-4);
+    }
+
+    .teacher-table-container {
+        overflow-x: auto;
+    }
+
+    .teacher-stat-number {
+        font-size: var(--text-3xl) !important;
+    }
+
+    .teacher-stat-icon {
+        width: 50px !important;
+        height: 50px !important;
+    }
+}
+
+/* ===== ANIMACIONES ===== */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.teacher-fade-in {
+    animation: fadeInUp 0.5s ease;
+}
+
+/* ===== SCROLLBAR PERSONALIZADO ===== */
+.teacher-table-container::-webkit-scrollbar {
+    height: 8px;
+}
+
+.teacher-table-container::-webkit-scrollbar-track {
+    background: var(--gray-100);
+    border-radius: var(--radius-full);
+}
+
+.teacher-table-container::-webkit-scrollbar-thumb {
+    background: var(--gray-400);
+    border-radius: var(--radius-full);
+}
+
+.teacher-table-container::-webkit-scrollbar-thumb:hover {
+    background: var(--gray-500);
+}
+
+/* ===== SECTION HEADERS ===== */
+.teacher-section-header {
+    font-family: var(--font-secondary);
+    font-size: var(--text-2xl);
+    font-weight: var(--font-bold);
+    color: var(--teacher-text-primary);
+    margin-top: var(--space-8);
+    margin-bottom: var(--space-4);
+}

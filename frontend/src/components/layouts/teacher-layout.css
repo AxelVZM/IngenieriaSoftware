@@ -1,0 +1,246 @@
+/* =========================================
+   TEACHER LAYOUT - DISEÑO PREMIUM
+   Colores Institucionales: Negro, Blanco y Gradientes
+   ========================================= */
+
+/* ===== SIDEBAR (DRAWER) - PREMIUM ===== */
+.teacher-drawer {
+    background: linear-gradient(180deg, #000000 0%, #1a1a1a 50%, #2d2d2d 100%) !important;
+}
+
+.teacher-drawer .MuiDrawer-paper {
+    background: linear-gradient(180deg, #000000 0%, #1a1a1a 50%, #2d2d2d 100%) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.15) !important;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Header del Sidebar con efecto premium */
+.teacher-drawer .MuiToolbar-root {
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.3) 0%, rgba(45, 45, 45, 0.3) 100%);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    min-height: 64px !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.teacher-drawer .MuiToolbar-root::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #000000 0%, #4a4a4a 50%, #000000 100%);
+}
+
+.teacher-drawer-title {
+    color: var(--white) !important;
+    font-weight: var(--font-bold) !important;
+    font-family: var(--font-secondary) !important;
+    font-size: var(--text-xl) !important;
+    letter-spacing: 0.8px;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+    background: linear-gradient(135deg, #ffffff 0%, #d1d5db 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Dividers con gradiente sutil */
+.teacher-drawer .MuiDivider-root {
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    height: 1px;
+    border: none;
+}
+
+/* Menu Items - Premium Design */
+.teacher-menu-item {
+    color: rgba(255, 255, 255, 0.75) !important;
+    transition: all var(--transition-base) !important;
+    margin: var(--space-2) var(--space-3) !important;
+    border-radius: var(--radius-lg) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.teacher-menu-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    background: linear-gradient(135deg, #ffffff 0%, #d1d5db 100%);
+    transition: width var(--transition-base);
+}
+
+.teacher-menu-item:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: var(--white) !important;
+    transform: translateX(4px);
+}
+
+.teacher-menu-item:hover::before {
+    width: 4px;
+}
+
+.teacher-menu-item.Mui-selected {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(209, 213, 219, 0.1) 100%) !important;
+    color: var(--white) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.teacher-menu-item.Mui-selected::before {
+    width: 4px;
+}
+
+.teacher-menu-item.Mui-selected:hover {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(209, 213, 219, 0.15) 100%) !important;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* Menu Icons con animación */
+.teacher-menu-icon {
+    color: rgba(255, 255, 255, 0.75) !important;
+    min-width: 44px !important;
+    transition: all var(--transition-base) !important;
+}
+
+.teacher-menu-item.Mui-selected .teacher-menu-icon {
+    color: #ffffff !important;
+    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.4));
+}
+
+.teacher-menu-item:hover .teacher-menu-icon {
+    color: var(--white) !important;
+    transform: scale(1.1);
+}
+
+/* Menu Text */
+.teacher-menu-text {
+    font-weight: var(--font-medium) !important;
+    font-family: var(--font-primary) !important;
+}
+
+.teacher-menu-item.Mui-selected .teacher-menu-text {
+    font-weight: var(--font-semibold) !important;
+}
+
+/* Logout Button con efecto especial */
+.teacher-logout-item {
+    color: rgba(255, 255, 255, 0.75) !important;
+    margin: var(--space-2) var(--space-3) !important;
+    border-radius: var(--radius-lg) !important;
+    transition: all var(--transition-base) !important;
+}
+
+.teacher-logout-item:hover {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.2) 100%) !important;
+    color: #ef4444 !important;
+    transform: translateX(4px);
+}
+
+.teacher-logout-item:hover .teacher-menu-icon {
+    color: #ef4444 !important;
+    transform: scale(1.1);
+}
+
+/* ===== HEADER (APPBAR) - GLASSMORPHISM ===== */
+.teacher-appbar {
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.85) 0%, rgba(45, 45, 45, 0.85) 100%) !important;
+    backdrop-filter: blur(16px) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+}
+
+.teacher-appbar-title {
+    font-family: var(--font-secondary) !important;
+    font-weight: var(--font-bold) !important;
+    color: var(--white) !important;
+    font-size: var(--text-lg) !important;
+    letter-spacing: 0.5px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.teacher-appbar-user {
+    color: rgba(255, 255, 255, 0.95) !important;
+    font-weight: var(--font-medium) !important;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(209, 213, 219, 0.1) 100%);
+    backdrop-filter: blur(10px);
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-full);
+    font-size: var(--text-sm) !important;
+    font-family: var(--font-primary) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transition: all var(--transition-base);
+}
+
+.teacher-appbar-user:hover {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(209, 213, 219, 0.15) 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    transform: translateY(-2px);
+}
+
+.teacher-menu-button {
+    color: var(--white) !important;
+    transition: all var(--transition-base) !important;
+}
+
+.teacher-menu-button:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+    transform: rotate(90deg);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .teacher-drawer-title {
+        font-size: var(--text-base) !important;
+    }
+
+    .teacher-appbar-title {
+        font-size: var(--text-base) !important;
+    }
+
+    .teacher-appbar-user {
+        font-size: var(--text-xs) !important;
+        padding: var(--space-1) var(--space-3);
+    }
+
+    .teacher-menu-item {
+        margin: var(--space-1) var(--space-2) !important;
+    }
+}
+
+/* ===== MAIN CONTENT AREA ===== */
+.teacher-main-content {
+    background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%) !important;
+    min-height: calc(100vh - 64px);
+    position: relative;
+}
+
+.teacher-main-content::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 200px;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.02) 0%, transparent 100%);
+    pointer-events: none;
+}
+
+/* ===== DECORATIVE ACCENTS ===== */
+.teacher-drawer .MuiToolbar-root::after {
+    content: '';
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    height: 40px;
+    background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.05) 0%, transparent 70%);
+    pointer-events: none;
+}

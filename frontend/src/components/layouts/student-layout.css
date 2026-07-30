@@ -1,0 +1,228 @@
+/* =========================================
+   STUDENT LAYOUT - DISEÑO PREMIUM
+   Colores Institucionales con Gradientes Modernos
+   ========================================= */
+
+/* ===== SIDEBAR (DRAWER) - PREMIUM ===== */
+.student-drawer {
+    background: linear-gradient(180deg, #000000 0%, #1a1a1a 50%, #2d2d2d 100%) !important;
+}
+
+.student-drawer .MuiDrawer-paper {
+    background: linear-gradient(180deg, #000000 0%, #1a1a1a 50%, #2d2d2d 100%) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.15) !important;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Header del Sidebar con efecto premium */
+.student-drawer .MuiToolbar-root {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    min-height: 64px !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.student-drawer .MuiToolbar-root::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+}
+
+.student-drawer-title {
+    color: var(--white) !important;
+    font-weight: var(--font-bold) !important;
+    font-family: var(--font-secondary) !important;
+    font-size: var(--text-xl) !important;
+    letter-spacing: 0.5px;
+    text-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+}
+
+/* Dividers con gradiente sutil */
+.student-drawer .MuiDivider-root {
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    height: 1px;
+    border: none;
+}
+
+/* Menu Items - Premium Design */
+.student-menu-item {
+    color: rgba(255, 255, 255, 0.75) !important;
+    transition: all var(--transition-base) !important;
+    margin: var(--space-2) var(--space-3) !important;
+    border-radius: var(--radius-lg) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.student-menu-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    transition: width var(--transition-base);
+}
+
+.student-menu-item:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: var(--white) !important;
+    transform: translateX(4px);
+}
+
+.student-menu-item:hover::before {
+    width: 4px;
+}
+
+.student-menu-item.Mui-selected {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%) !important;
+    color: var(--white) !important;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.student-menu-item.Mui-selected::before {
+    width: 4px;
+}
+
+.student-menu-item.Mui-selected:hover {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.25) 0%, rgba(118, 75, 162, 0.25) 100%) !important;
+    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+}
+
+/* Menu Icons con animación */
+.student-menu-icon {
+    color: rgba(255, 255, 255, 0.75) !important;
+    min-width: 44px !important;
+    transition: all var(--transition-base) !important;
+}
+
+.student-menu-item.Mui-selected .student-menu-icon {
+    color: #667eea !important;
+    filter: drop-shadow(0 0 8px rgba(102, 126, 234, 0.6));
+}
+
+.student-menu-item:hover .student-menu-icon {
+    color: var(--white) !important;
+    transform: scale(1.1);
+}
+
+/* Menu Text */
+.student-menu-text {
+    font-weight: var(--font-medium) !important;
+    font-family: var(--font-primary) !important;
+}
+
+.student-menu-item.Mui-selected .student-menu-text {
+    font-weight: var(--font-semibold) !important;
+}
+
+/* Logout Button con efecto especial */
+.student-logout-item {
+    color: rgba(255, 255, 255, 0.75) !important;
+    margin: var(--space-2) var(--space-3) !important;
+    border-radius: var(--radius-lg) !important;
+    transition: all var(--transition-base) !important;
+}
+
+.student-logout-item:hover {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.2) 100%) !important;
+    color: #ef4444 !important;
+    transform: translateX(4px);
+}
+
+.student-logout-item:hover .student-menu-icon {
+    color: #ef4444 !important;
+    transform: scale(1.1);
+}
+
+/* ===== HEADER (APPBAR) - GLASSMORPHISM ===== */
+.student-appbar {
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.8) 0%, rgba(45, 45, 45, 0.8) 100%) !important;
+    backdrop-filter: blur(16px) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
+}
+
+.student-appbar-title {
+    font-family: var(--font-secondary) !important;
+    font-weight: var(--font-semibold) !important;
+    color: var(--white) !important;
+    font-size: var(--text-lg) !important;
+    letter-spacing: 0.3px;
+}
+
+.student-appbar-user {
+    color: rgba(255, 255, 255, 0.95) !important;
+    font-weight: var(--font-medium) !important;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
+    backdrop-filter: blur(10px);
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-full);
+    font-size: var(--text-sm) !important;
+    font-family: var(--font-primary) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+    transition: all var(--transition-base);
+}
+
+.student-appbar-user:hover {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    transform: translateY(-2px);
+}
+
+.student-menu-button {
+    color: var(--white) !important;
+    transition: all var(--transition-base) !important;
+}
+
+.student-menu-button:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+    transform: rotate(90deg);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .student-drawer-title {
+        font-size: var(--text-base) !important;
+    }
+
+    .student-appbar-title {
+        font-size: var(--text-base) !important;
+    }
+
+    .student-appbar-user {
+        font-size: var(--text-xs) !important;
+        padding: var(--space-1) var(--space-3);
+    }
+
+    .student-menu-item {
+        margin: var(--space-1) var(--space-2) !important;
+    }
+}
+
+/* ===== MAIN CONTENT AREA ===== */
+.student-main-content {
+    background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%) !important;
+    min-height: calc(100vh - 64px);
+    position: relative;
+}
+
+.student-main-content::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 200px;
+    background: linear-gradient(180deg, rgba(102, 126, 234, 0.03) 0%, transparent 100%);
+    pointer-events: none;
+}
