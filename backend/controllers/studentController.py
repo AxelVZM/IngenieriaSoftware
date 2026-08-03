@@ -13,7 +13,7 @@ async def get_student_by_id(student_id: int, db: asyncpg.Connection):
 
 async def create_student(data: StudentCreate, db: asyncpg.Connection):
     from utils.security import get_password_hash
-    
+
     try:
         # Check if DNI already exists
         existing = await db.fetchrow("SELECT id FROM students WHERE dni = $1", data.dni)
@@ -35,7 +35,7 @@ async def update_student(student_id: int, data: StudentUpdate, db: asyncpg.Conne
     fields = []
     values = []
     idx = 1
-    
+
     for field, value in data.dict(exclude_unset=True).items():
         if field == "password" and value:
             from utils.security import get_password_hash
@@ -45,15 +45,41 @@ async def update_student(student_id: int, data: StudentUpdate, db: asyncpg.Conne
             fields.append(f"{field} = ${idx}")
             values.append(value)
         idx += 1
-    
+
     if not fields:
         return {"message": "No hay campos para actualizar"}
-    
+
     values.append(student_id)
     query = f"UPDATE students SET {', '.join(fields)} WHERE id = ${idx}"
     await db.execute(query, *values)
     return {"message": "Estudiante actualizado correctamente"}
 
 async def delete_student(student_id: int, db: asyncpg.Connection):
-    await db.execute("DELETE FROM students WHERE id = $1", student_id)
+    # Fix BG-U5: antes se borraba directo sin revisar dependencias, lo que
+    # podia romper por restriccion de llave foranea (FK) sin aviso claro,
+    # o dejar registros huerfanos si no hay FK definida en la BD.
+    # Se valida primero si el estudiante tiene matriculas o asistencias
+    # asociadas, igual que se hizo para ciclos/cursos en BG-C4.
+    enrollments_count = await db.fetchval(
+        "SELECT COUNT(*) FROM enrollments WHERE student_id = $1", student_id
+    )
+    if enrollments_count and enrollments_count > 0:
+        return {
+            "error": f"No se puede eliminar: el estudiante tiene {enrollments_count} "
+                     f"matricula(s) asociada(s). Elimina primero sus matriculas."
+        }
+
+    attendance_count = await db.fetchval(
+        "SELECT COUNT(*) FROM attendance WHERE student_id = $1", student_id
+    )
+    if attendance_count and attendance_count > 0:
+        return {
+            "error": f"No se puede eliminar: el estudiante tiene {attendance_count} "
+                     f"registro(s) de asistencia asociado(s)."
+        }
+
+    result = await db.execute("DELETE FROM students WHERE id = $1", student_id)
+    if result == "DELETE 0":
+        return {"error": "Estudiante no encontrado"}
+
     return {"message": "Estudiante eliminado correctamente"}

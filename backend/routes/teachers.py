@@ -20,7 +20,10 @@ async def get_teacher(teacher_id: int, db: asyncpg.Connection = Depends(get_db))
 
 @router.post("", dependencies=[Depends(require_role(["admin"]))], status_code=status.HTTP_201_CREATED)
 async def create_teacher(teacher: TeacherCreate, db: asyncpg.Connection = Depends(get_db)):
-    return await teacherController.create_teacher(teacher, db)
+    result = await teacherController.create_teacher(teacher, db)
+    if result and "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
 
 @router.put("/{teacher_id}", dependencies=[Depends(require_role(["admin"]))])
 async def update_teacher(teacher_id: int, teacher: TeacherUpdate, db: asyncpg.Connection = Depends(get_db)):

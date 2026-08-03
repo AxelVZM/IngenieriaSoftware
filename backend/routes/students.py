@@ -10,14 +10,14 @@ router = APIRouter(prefix="/students", tags=["students"])
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register_student(student: StudentCreate, db: asyncpg.Connection = Depends(get_db)):
     from utils.security import create_access_token
-    
+
     result = await studentController.create_student(student, db)
-    
+
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
-        
+
     token = create_access_token({"id": result['id'], "role": "student"})
-    
+
     return {
         "token": token,
         "user": {
@@ -45,4 +45,13 @@ async def update_student(student_id: int, student: StudentUpdate, db: asyncpg.Co
 
 @router.delete("/{student_id}", dependencies=[Depends(require_role(["admin"]))])
 async def delete_student(student_id: int, db: asyncpg.Connection = Depends(get_db)):
-    return await studentController.delete_student(student_id, db)
+    # Fix BG-U5: delete_student() ahora puede devolver {"error": "..."} cuando
+    # el estudiante tiene matriculas o asistencias asociadas, o cuando no
+    # existe. Se traduce a un codigo HTTP correcto en vez de responder
+    # siempre 200 con el error escondido en el body.
+    result = await studentController.delete_student(student_id, db)
+    if "error" in result:
+        if "no encontrado" in result["error"].lower():
+            raise HTTPException(status_code=404, detail=result["error"])
+        raise HTTPException(status_code=409, detail=result["error"])
+    return result
