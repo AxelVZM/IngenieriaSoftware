@@ -98,6 +98,7 @@ async def test_update_student_sin_campos():
 @pytest.mark.asyncio
 async def test_delete_student():
     db = AsyncMock()
+    db.fetchval.return_value = 0  # simula que no tiene matriculas ni asistencias
     result = await studentController.delete_student(1, db)
     db.execute.assert_awaited_once()
     assert result["message"] == "Estudiante eliminado correctamente"
@@ -165,6 +166,8 @@ async def test_create_teacher_dni_duplicado():
 @pytest.mark.asyncio
 async def test_delete_teacher():
     db = AsyncMock()
+    db.fetchval.return_value = 0  # simula que no tiene ofertas asignadas
+    db.execute.return_value = "DELETE 1"  # simula que sí borró un registro
     result = await teacherController.delete_teacher(1, db)
     db.execute.assert_awaited_once()
     assert "message" in result

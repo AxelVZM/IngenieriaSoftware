@@ -31,6 +31,7 @@ import { teachersAPI } from '../../services/api';
 import './admin-dashboard.css';
 import { useDialog } from '../../hooks/useDialog';
 import DialogWrapper from '../common/DialogWrapper';
+import UsersSectionNav from './UsersSectionNav';
 
 const emptyForm = { first_name: '', last_name: '', dni: '', phone: '', email: '', specialization: '' };
 
@@ -140,6 +141,8 @@ const AdminTeachers = () => {
 
   return (
     <Box className="admin-dashboard">
+      <UsersSectionNav />
+
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" className="admin-dashboard-title">Gestión de Docentes</Typography>
         <Button

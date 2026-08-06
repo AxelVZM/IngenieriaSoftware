@@ -14,22 +14,21 @@ import {
   InputAdornment,
   Chip,
   MenuItem,
+  CircularProgress,
 } from "@mui/material";
 import { Search as SearchIcon } from "@mui/icons-material";
 import { studentsAPI, teachersAPI } from "../../services/api";
+import UsersSectionNav from "./UsersSectionNav";
 import "./admin-dashboard.css";
 
 const AdminUsers = () => {
-  // Fix BG-U4: antes esta pantalla se llamaba "Usuarios Registrados" pero
-  // solo consultaba studentsAPI.getAll(), nunca docentes. Ahora combina
-  // ambos roles en una sola lista, que es lo que el nombre de la pantalla
-  // sugiere. (No se incluye "admin" porque el sistema no expone un
-  // endpoint para listar administradores).
   const [users, setUsers] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [loading, setLoading] = useState(true); // Fix UX-01
 
   const fetchUsers = async () => {
+    setLoading(true);
     try {
       const [students, teachers] = await Promise.all([
         studentsAPI.getAll(),
@@ -55,6 +54,8 @@ const AdminUsers = () => {
       setUsers([...studentRows, ...teacherRows]);
     } catch (err) {
       console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -83,6 +84,8 @@ const AdminUsers = () => {
 
   return (
     <Box className="admin-dashboard">
+      <UsersSectionNav />
+
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" className="admin-dashboard-title">
           Usuarios Registrados
@@ -121,47 +124,55 @@ const AdminUsers = () => {
         />
       </Box>
 
-      <TableContainer component={Paper} className="admin-table-container">
-        <Table className="admin-table">
-          <TableHead className="admin-table-head">
-            <TableRow>
-              <TableCell className="admin-table-head-cell">DNI</TableCell>
-              <TableCell className="admin-table-head-cell">Nombre</TableCell>
-              <TableCell className="admin-table-head-cell">Teléfono</TableCell>
-              <TableCell className="admin-table-head-cell">Rol</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {getFilteredUsers().map((u) => (
-              <TableRow key={u.id} className="admin-table-row">
-                <TableCell className="admin-table-cell">{u.dni}</TableCell>
-                <TableCell className="admin-table-cell">
-                  <Typography variant="subtitle2" fontWeight="bold">
-                    {u.name}
-                  </Typography>
-                </TableCell>
-                <TableCell className="admin-table-cell">{u.phone}</TableCell>
-                <TableCell className="admin-table-cell">
-                  <Chip
-                    label={u.role}
-                    size="small"
-                    color={u.role === "Docente" ? "primary" : "default"}
-                  />
-                </TableCell>
-              </TableRow>
-            ))}
-            {getFilteredUsers().length === 0 && (
+      {loading ? (
+        // Fix UX-01: antes, mientras cargaba, la tabla se veia vacia sin
+        // ninguna explicacion. Ahora se muestra un indicador claro.
+        <Box display="flex" justifyContent="center" alignItems="center" py={6}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <TableContainer component={Paper} className="admin-table-container">
+          <Table className="admin-table">
+            <TableHead className="admin-table-head">
               <TableRow>
-                <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
-                  <Typography color="text.secondary">
-                    {searchQuery ? "No se encontraron usuarios" : "No hay usuarios registrados"}
-                  </Typography>
-                </TableCell>
+                <TableCell className="admin-table-head-cell">DNI</TableCell>
+                <TableCell className="admin-table-head-cell">Nombre</TableCell>
+                <TableCell className="admin-table-head-cell">Teléfono</TableCell>
+                <TableCell className="admin-table-head-cell">Rol</TableCell>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            </TableHead>
+            <TableBody>
+              {getFilteredUsers().map((u) => (
+                <TableRow key={u.id} className="admin-table-row">
+                  <TableCell className="admin-table-cell">{u.dni}</TableCell>
+                  <TableCell className="admin-table-cell">
+                    <Typography variant="subtitle2" fontWeight="bold">
+                      {u.name}
+                    </Typography>
+                  </TableCell>
+                  <TableCell className="admin-table-cell">{u.phone}</TableCell>
+                  <TableCell className="admin-table-cell">
+                    <Chip
+                      label={u.role}
+                      size="small"
+                      color={u.role === "Docente" ? "primary" : "default"}
+                    />
+                  </TableCell>
+                </TableRow>
+              ))}
+              {getFilteredUsers().length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
+                    <Typography color="text.secondary">
+                      {searchQuery ? "No se encontraron usuarios" : "No hay usuarios registrados"}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
     </Box>
   );
 };

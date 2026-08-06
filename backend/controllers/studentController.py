@@ -1,5 +1,6 @@
 import asyncpg
 from models.student import StudentCreate, StudentUpdate
+from utils.security import get_password_hash  # Fix EST-06: import movido al inicio del archivo
 
 async def get_all_students(db: asyncpg.Connection):
     students = await db.fetch("SELECT * FROM students ORDER BY last_name, first_name")
@@ -12,8 +13,6 @@ async def get_student_by_id(student_id: int, db: asyncpg.Connection):
     return dict(student)
 
 async def create_student(data: StudentCreate, db: asyncpg.Connection):
-    from utils.security import get_password_hash
-
     try:
         # Check if DNI already exists
         existing = await db.fetchrow("SELECT id FROM students WHERE dni = $1", data.dni)
@@ -38,7 +37,6 @@ async def update_student(student_id: int, data: StudentUpdate, db: asyncpg.Conne
 
     for field, value in data.dict(exclude_unset=True).items():
         if field == "password" and value:
-            from utils.security import get_password_hash
             fields.append(f"password_hash = ${idx}")
             values.append(get_password_hash(value))
         else:
@@ -55,11 +53,7 @@ async def update_student(student_id: int, data: StudentUpdate, db: asyncpg.Conne
     return {"message": "Estudiante actualizado correctamente"}
 
 async def delete_student(student_id: int, db: asyncpg.Connection):
-    # Fix BG-U5: antes se borraba directo sin revisar dependencias, lo que
-    # podia romper por restriccion de llave foranea (FK) sin aviso claro,
-    # o dejar registros huerfanos si no hay FK definida en la BD.
-    # Se valida primero si el estudiante tiene matriculas o asistencias
-    # asociadas, igual que se hizo para ciclos/cursos en BG-C4.
+    # Fix BG-U5: valida dependencias antes de borrar.
     enrollments_count = await db.fetchval(
         "SELECT COUNT(*) FROM enrollments WHERE student_id = $1", student_id
     )

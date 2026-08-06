@@ -21,6 +21,7 @@ import {
   DialogContent,
   DialogActions,
   InputAdornment,
+  CircularProgress,
 } from "@mui/material";
 import {
   Search as SearchIcon,
@@ -33,6 +34,7 @@ import {
   enrollmentsAPI,
   studentsAPI,
 } from "../../services/api";
+import UsersSectionNav from "./UsersSectionNav";
 import "./admin-dashboard.css";
 import { useDialog } from "../../hooks/useDialog";
 import DialogWrapper from "../common/DialogWrapper";
@@ -47,17 +49,16 @@ const emptyForm = {
 };
 
 const AdminStudents = () => {
-  // Fix BG-U6: 'students' ahora SI se usa y se muestra por defecto.
   const [students, setStudents] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [loading, setLoading] = useState(true); // Fix UX-01
 
   const [filterType, setFilterType] = useState("course");
   const [courseOfferings, setCourseOfferings] = useState([]);
   const [packageOfferings, setPackageOfferings] = useState([]);
   const [selectedOfferingId, setSelectedOfferingId] = useState("");
-  const [filteredStudents, setFilteredStudents] = useState(null); // null = sin filtro aplicado
+  const [filteredStudents, setFilteredStudents] = useState(null);
 
-  // Fix BG-U3: estado para edicion
   const [openDialog, setOpenDialog] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
@@ -65,11 +66,14 @@ const AdminStudents = () => {
   const { confirmDialog, alertDialog, showConfirm, showAlert, closeConfirm, closeAlert } = useDialog();
 
   const fetchStudents = async () => {
+    setLoading(true);
     try {
       const data = await studentsAPI.getAll();
       setStudents(data);
     } catch (err) {
       console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -127,12 +131,6 @@ const AdminStudents = () => {
     fetchOfferingsData();
   }, []);
 
-  const handleOpenCreate = () => {
-    setEditingId(null);
-    setForm(emptyForm);
-    setOpenDialog(true);
-  };
-
   const handleOpenEdit = (student) => {
     setEditingId(student.id);
     setForm({
@@ -148,8 +146,6 @@ const AdminStudents = () => {
 
   const handleSave = async () => {
     try {
-      // El DNI no se reenvia en la edicion: es el identificador del
-      // estudiante y no deberia cambiar desde este formulario.
       const { dni, ...updateData } = form;
       await studentsAPI.update(editingId, updateData);
       showAlert("Estudiante actualizado exitosamente", "success");
@@ -176,8 +172,6 @@ const AdminStudents = () => {
       showAlert("Estudiante eliminado exitosamente", "success");
       await fetchStudents();
     } catch (err) {
-      // Fix BG-U5 en accion: si el estudiante tiene matriculas/asistencias,
-      // el backend responde 409 con un mensaje claro que se muestra aqui.
       showAlert(err.message || "Error al eliminar estudiante", "error");
     }
   };
@@ -192,12 +186,12 @@ const AdminStudents = () => {
     );
   };
 
-  // Si hay un filtro de oferta aplicado, se muestra ese resultado.
-  // Si no, se muestra la lista completa de estudiantes (fix BG-U6).
   const rowsToShow = filteredStudents !== null ? filteredStudents : getFilteredBySearch();
 
   return (
     <Box className="admin-dashboard">
+      <UsersSectionNav />
+
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" className="admin-dashboard-title">
           Estudiantes Matriculados
@@ -273,52 +267,58 @@ const AdminStudents = () => {
         {filteredStudents !== null ? "Resultados del Filtro" : `Todos los Estudiantes (${rowsToShow.length})`}
       </Typography>
 
-      <TableContainer component={Paper} variant="outlined" className="admin-table-container">
-        <Table className="admin-table">
-          <TableHead className="admin-table-head">
-            <TableRow>
-              <TableCell className="admin-table-head-cell">DNI</TableCell>
-              <TableCell className="admin-table-head-cell">Nombre Completo</TableCell>
-              <TableCell className="admin-table-head-cell">Teléfono</TableCell>
-              {filteredStudents === null && (
-                <TableCell className="admin-table-head-cell">Acciones</TableCell>
-              )}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {rowsToShow.map((s) => (
-              <TableRow key={s.enrollment_id || s.id} className="admin-table-row">
-                <TableCell className="admin-table-cell">{s.dni}</TableCell>
-                <TableCell className="admin-table-cell">
-                  <Typography variant="subtitle2" fontWeight="bold">
-                    {s.first_name} {s.last_name}
-                  </Typography>
-                </TableCell>
-                <TableCell className="admin-table-cell">{s.phone}</TableCell>
+      {loading ? (
+        <Box display="flex" justifyContent="center" alignItems="center" py={6}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <TableContainer component={Paper} variant="outlined" className="admin-table-container">
+          <Table className="admin-table">
+            <TableHead className="admin-table-head">
+              <TableRow>
+                <TableCell className="admin-table-head-cell">DNI</TableCell>
+                <TableCell className="admin-table-head-cell">Nombre Completo</TableCell>
+                <TableCell className="admin-table-head-cell">Teléfono</TableCell>
                 {filteredStudents === null && (
-                  <TableCell className="admin-table-cell">
-                    <Tooltip title="Editar estudiante">
-                      <IconButton size="small" onClick={() => handleOpenEdit(s)} className="admin-icon-button">
-                        <EditIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <IconButton size="small" color="error" onClick={() => handleDelete(s.id)} className="admin-icon-button">
-                      <DeleteIcon />
-                    </IconButton>
-                  </TableCell>
+                  <TableCell className="admin-table-head-cell">Acciones</TableCell>
                 )}
               </TableRow>
-            ))}
-            {rowsToShow.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={filteredStudents === null ? 4 : 2} align="center" sx={{ py: 3 }}>
-                  <Typography color="text.secondary">Sin resultados</Typography>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            </TableHead>
+            <TableBody>
+              {rowsToShow.map((s) => (
+                <TableRow key={s.enrollment_id || s.id} className="admin-table-row">
+                  <TableCell className="admin-table-cell">{s.dni}</TableCell>
+                  <TableCell className="admin-table-cell">
+                    <Typography variant="subtitle2" fontWeight="bold">
+                      {s.first_name} {s.last_name}
+                    </Typography>
+                  </TableCell>
+                  <TableCell className="admin-table-cell">{s.phone}</TableCell>
+                  {filteredStudents === null && (
+                    <TableCell className="admin-table-cell">
+                      <Tooltip title="Editar estudiante">
+                        <IconButton size="small" onClick={() => handleOpenEdit(s)} className="admin-icon-button">
+                          <EditIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <IconButton size="small" color="error" onClick={() => handleDelete(s.id)} className="admin-icon-button">
+                        <DeleteIcon />
+                      </IconButton>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+              {rowsToShow.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={filteredStudents === null ? 4 : 2} align="center" sx={{ py: 3 }}>
+                    <Typography color="text.secondary">Sin resultados</Typography>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
 
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth className="admin-dialog">
         <DialogTitle>Editar Estudiante</DialogTitle>
