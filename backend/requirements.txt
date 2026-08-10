@@ -12,7 +12,5 @@ httpx==0.28.1
 psycopg2-binary==2.9.9
 cloudinary==1.41.0
 selenium==4.27.1
-
-
 pytest
 pytest-asyncio

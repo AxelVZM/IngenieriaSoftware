@@ -1,67 +1,126 @@
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from utils.security import decode_token
-from config.database import get_db
-import asyncpg
+"""
+Middleware de autenticacion y autorizacion.
 
-security = HTTPBearer()
+`get_current_user` se debe aplicar con Depends() en TODAS las rutas
+protegidas del backend. La proteccion del frontend (ProtectedRoute) es solo
+de experiencia de usuario: no sustituye esta validacion.
+"""
+
+from __future__ import annotations
+
+import logging
+
+import asyncpg
+from fastapi import Depends, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from config.database import get_db
+from utils.errors import DB_UNAVAILABLE_MESSAGE, api_error
+from utils.security import TokenExpiredError, TokenInvalidError, decode_token
+
+logger = logging.getLogger(__name__)
+
+security = HTTPBearer(auto_error=False)
+
+_WWW_AUTH = {"WWW-Authenticate": "Bearer"}
+
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: asyncpg.Connection = Depends(get_db)
-):
-    token = credentials.credentials
-    payload = decode_token(token)
-    
-    if payload is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials"
+    db: asyncpg.Connection = Depends(get_db),
+) -> dict:
+    """
+    Valida el token Bearer y devuelve el usuario autenticado.
+
+    Distingue explicitamente:
+      - TOKEN_MISSING  (401): no se envio cabecera Authorization.
+      - TOKEN_EXPIRED  (401): el token caduco -> el frontend debe cerrar sesion.
+      - TOKEN_INVALID  (401): firma incorrecta o token mal formado.
+      - USER_NOT_FOUND (401): el token es valido pero la cuenta ya no existe.
+    """
+    if credentials is None or not credentials.credentials:
+        raise api_error(
+            401, "TOKEN_MISSING", "Sesión no iniciada. Inicia sesión para continuar.", headers=_WWW_AUTH
         )
-    
-    user_id = payload.get("id")
-    role = payload.get("role")
-    
-    if user_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token payload"
+
+    try:
+        payload = decode_token(credentials.credentials)
+    except TokenExpiredError:
+        raise api_error(
+            401,
+            "TOKEN_EXPIRED",
+            "Tu sesión ha expirado. Inicia sesión nuevamente.",
+            headers=_WWW_AUTH,
         )
-    
-    # If student, they might not be in users table
-    if role == "student":
-        student = await db.fetchrow(
-            "SELECT id, dni FROM students WHERE id = $1",
-            user_id
+    except TokenInvalidError:
+        raise api_error(
+            401, "TOKEN_INVALID", "Sesión inválida. Inicia sesión nuevamente.", headers=_WWW_AUTH
         )
-        if student:
-            return {
-                "id": student['id'],
-                "username": student['dni'],
-                "role": "student",
-                "related_id": None
-            }
-    
-    # Otherwise check users table
-    user = await db.fetchrow(
-        "SELECT id, username, role, related_id FROM users WHERE id = $1",
-        user_id
-    )
-    
+
+    user_id = payload["id"]
+    role = payload["role"]
+
+    try:
+        if role == "student":
+            student = await db.fetchrow(
+                "SELECT id, dni FROM students WHERE id = $1", user_id
+            )
+            if student:
+                return {
+                    "id": student["id"],
+                    "username": student["dni"],
+                    "role": "student",
+                    "related_id": None,
+                }
+            # Si el rol dice student pero no existe, no se sigue buscando en
+            # users: eso permitiria escalar privilegios con un id coincidente.
+            raise api_error(
+                401, "USER_NOT_FOUND", "Esta cuenta ya no existe. Comunícate con la administración de la academia.", headers=_WWW_AUTH
+            )
+
+        user = await db.fetchrow(
+            "SELECT id, username, role, related_id FROM users WHERE id = $1",
+            user_id,
+        )
+    except asyncpg.PostgresError:
+        logger.exception("Error de base de datos al validar el token")
+        raise api_error(503, "DB_UNAVAILABLE", DB_UNAVAILABLE_MESSAGE)
+
     if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found"
+        raise api_error(
+            401, "USER_NOT_FOUND", "Esta cuenta ya no existe. Comunícate con la administración de la academia.", headers=_WWW_AUTH
         )
-    
+
+    # El rol autoritativo es el de la base de datos, no el del token: si a un
+    # usuario le cambian el rol, el token viejo no conserva permisos antiguos.
+    if user["role"] != role:
+        raise api_error(
+            401,
+            "TOKEN_INVALID",
+            "Tu sesión ya no es válida. Inicia sesión nuevamente.",
+            headers=_WWW_AUTH,
+        )
+
     return dict(user)
 
-def require_role(allowed_roles: list):
-    def role_checker(current_user: dict = Depends(get_current_user)):
+
+def require_role(allowed_roles: list[str]):
+    """
+    Dependencia que exige uno de los roles indicados.
+
+    Uso:
+        @router.get("/admin/algo")
+        async def handler(user = Depends(require_role(["admin"]))):
+            ...
+    """
+
+    def role_checker(current_user: dict = Depends(get_current_user)) -> dict:
         if current_user["role"] not in allowed_roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not enough permissions"
+            raise api_error(
+                403,
+                "FORBIDDEN",
+                "No tienes permisos para realizar esta acción.",
             )
         return current_user
+
     return role_checker

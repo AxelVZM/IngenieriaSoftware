@@ -2,7 +2,9 @@
 node_modules/
 uploads/
 __pycache__
+venv/
 .venv/
+*.pyc
 bd.txt
 
 services/notifications_whatsapp/screenshots/

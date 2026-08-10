@@ -4,6 +4,58 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || "http://localhost:4000/api";
 
+// Códigos que significan "la sesión ya no sirve" -> cerrar sesión local
+const SESSION_ERROR_CODES = [
+  "TOKEN_EXPIRED",
+  "TOKEN_INVALID",
+  "TOKEN_MISSING",
+  "USER_NOT_FOUND",
+];
+
+/**
+ * Error enriquecido: además del mensaje trae el código del backend
+ * y el status HTTP, para que los componentes puedan reaccionar.
+ */
+export class ApiError extends Error {
+  constructor(message, { code = "UNKNOWN_ERROR", status = 0, fields = [] } = {}) {
+    super(message);
+    this.name = "ApiError";
+    this.code = code;
+    this.status = status;
+    this.fields = fields;
+  }
+}
+
+function clearSession() {
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+}
+
+/**
+ * Extrae el mensaje del cuerpo de error, soportando:
+ *  - Formato nuevo: { detail: { code, message, fields } }
+ *  - Formato antiguo: { detail: "texto" } o { error: "texto" }
+ */
+function parseErrorBody(body, status) {
+  const detail = body?.detail;
+
+  if (detail && typeof detail === "object" && !Array.isArray(detail)) {
+    return new ApiError(detail.message || "Error en la petición", {
+      code: detail.code || "HTTP_ERROR",
+      status,
+      fields: detail.fields || [],
+    });
+  }
+
+  const message =
+    (typeof detail === "string" && detail) ||
+    body?.message ||
+    body?.error ||
+    "Error en la petición";
+
+  return new ApiError(message, { code: "HTTP_ERROR", status });
+}
+
 // Función helper para hacer peticiones
 async function request(endpoint, options = {}) {
   const token = localStorage.getItem("token");
@@ -22,27 +74,69 @@ async function request(endpoint, options = {}) {
     delete config.headers["Content-Type"];
   }
 
+  let response;
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
-    const data = await response.json();
+    response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+  } catch (networkError) {
+    // fetch solo falla así cuando no hay red o el servidor no responde
+    console.error("Network Error:", networkError);
+    throw new ApiError(
+      "No se pudo conectar con el servidor. Revisa tu conexión.",
+      { code: "NETWORK_ERROR" }
+    );
+  }
 
-    // Check if backend returned an error field
-    if (data.error) {
-      throw new Error(data.error);
+  // 204 No Content u otras respuestas sin cuerpo
+  if (response.status === 204) return null;
+
+  let body = null;
+  const raw = await response.text();
+  if (raw) {
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      body = null;
     }
+  }
 
-    if (!response.ok) {
-      // FastAPI HTTPException returns error in 'detail' field
-      throw new Error(
-        data.detail || data.message || data.error || "Error en la petición"
+  if (!response.ok) {
+    // Si el backend devolvió algo que no es JSON (ej. HTML de un 502)
+    if (body === null) {
+      throw new ApiError(
+        `Error del servidor (${response.status}). Intenta más tarde.`,
+        { code: "SERVER_ERROR", status: response.status }
       );
     }
 
-    return data;
-  } catch (error) {
-    console.error("API Error:", error);
+    const error = parseErrorBody(body, response.status);
+
+    // Sesión inválida o expirada: limpiar y mandar al login
+    if (response.status === 401 && SESSION_ERROR_CODES.includes(error.code)) {
+      clearSession();
+      if (!window.location.pathname.startsWith("/login")) {
+        window.location.href = "/login";
+      }
+    }
+
+    console.error("API Error:", error.code, error.message);
     throw error;
   }
+
+  // Red de seguridad para endpoints aún NO migrados al formato estándar.
+  // Algunos responden 200/201 pero con {"error": "..."} en el cuerpo, es decir,
+  // un fallo disfrazado de éxito (defecto BG-U1 en create_teacher). Sin esta
+  // comprobación la interfaz mostraría "creado correctamente" en un error.
+  // Cuando todos los controladores usen api_error(), este bloque sobra.
+  if (body && typeof body === "object" && typeof body.error === "string") {
+    const legacy = new ApiError(body.error, {
+      code: "LEGACY_ERROR",
+      status: response.status,
+    });
+    console.error("API Error (formato antiguo):", body.error);
+    throw legacy;
+  }
+
+  return body;
 }
 
 // API de autenticación
@@ -61,8 +155,9 @@ export const authAPI = {
 
 // API de estudiantes
 export const studentsAPI = {
+  // Se apunta a /auth/register para usar las validaciones reforzadas.
   register: (data) =>
-    request("/students/register", {
+    request("/auth/register", {
       method: "POST",
       body: JSON.stringify(data),
     }),
@@ -308,8 +403,9 @@ export const adminAPI = {
     const params = new URLSearchParams();
     if (cycleId) params.append("cycle_id", cycleId);
     if (studentId) params.append("student_id", studentId);
-    const url = `/admin/analytics${params.toString() ? "?" + params.toString() : ""
-      }`;
+    const url = `/admin/analytics${
+      params.toString() ? "?" + params.toString() : ""
+    }`;
     return request(url);
   },
   getNotifications: (studentId = null, type = null, limit = 50) => {
@@ -330,7 +426,11 @@ export const adminAPI = {
   sendAttendanceNotifications: (cycleId, date, groupLabel) =>
     request("/admin/send-attendance-notifications", {
       method: "POST",
-      body: JSON.stringify({ cycle_id: cycleId, date: date, group_label: groupLabel }),
+      body: JSON.stringify({
+        cycle_id: cycleId,
+        date: date,
+        group_label: groupLabel,
+      }),
     }),
 };
 
