@@ -163,8 +163,9 @@ async def send_payment_notifications(notification_type: str, payments: list):
         if not phone or len(phone) != 9 or not phone.startswith('9'):
             results.append({
                 'phone': phone,
+                'student': payment.get('student_name', 'Estudiante'),
                 'status': 'error',
-                'message': 'Número de teléfono inválido'
+                'message': 'Número de teléfono inválido (debe tener 9 dígitos y empezar con 9)'
             })
             continue
         

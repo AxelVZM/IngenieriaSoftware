@@ -32,7 +32,7 @@ APELLIDOS = [
     "Castro", "Romero", "Ramos", "Medina", "Navarro", "Campos"
 ]
 
-PHONES = ["969728039", "959399615", "985121933", "952873813"]
+PHONES = ["969728039", "956399615", "985121933", "952873813"]
 
 async def main():
     conn = await asyncpg.connect(DATABASE_URL)
