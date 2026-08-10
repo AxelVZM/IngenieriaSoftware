@@ -68,6 +68,17 @@ const ESTADOS = {
 const describirEstado = (estado) =>
   ESTADOS[estado] || { label: estado || 'Sin estado', color: 'default' };
 
+// SEM-02/UX-06: "pending" cubre dos situaciones distintas para el admin —
+// el estudiante todavía no subió nada, o ya subió el voucher y espera
+// revisión. El backend no tiene un estado intermedio propio, así que se
+// distingue aquí con la presencia de voucher_url.
+const describirPago = (matricula) => {
+  if (!matricula.payment_status) return 'Sin cuota';
+  if (matricula.payment_status === 'paid') return 'Pagado';
+  if (matricula.payment_status === 'overdue') return 'Vencido';
+  return matricula.voucher_url ? 'En revisión' : 'Sin comprobante';
+};
+
 // Refleja la máquina de estados del backend. Si el backend rechaza una
 // transición, la interfaz ni siquiera debería haberla ofrecido.
 const TRANSICIONES = {
@@ -293,13 +304,7 @@ const AdminEnrollmentsComplete = () => {
                     />
                   </TableCell>
                   <TableCell className="admin-table-cell">
-                    {matricula.payment_status
-                      ? matricula.payment_status === 'paid'
-                        ? 'Pagado'
-                        : matricula.payment_status === 'overdue'
-                          ? 'Vencido'
-                          : 'Pendiente'
-                      : 'Sin cuota'}
+                    {describirPago(matricula)}
                     {matricula.voucher_url && (
                       <>
                         {' · '}

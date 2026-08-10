@@ -18,6 +18,19 @@ Correcciones aplicadas respecto a la versión revisada:
   C-10  delete_enrollment verifica existencia y bloquea el borrado de
         matrículas con pagos aprobados.
   C-11  Se respeta la capacidad (capacity) de la oferta si está definida.
+  C-12  INT-07/FUN-02: la validación de duplicados (PASO 1) no cierra la
+        condición de carrera entre dos peticiones simultáneas — ambas pueden
+        pasar el SELECT antes de que cualquiera inserte. La BD tiene ahora
+        índices únicos parciales (ux_enrollments_course_active /
+        ux_enrollments_package_active) que garantizan RF13 al nivel de
+        motor; create_enrollment traduce esa violación en un error legible.
+  C-13  Los `return {"error": ...}` dentro de la transacción NO revertían
+        los ítems ya insertados en el mismo lote: `async with db.transaction()`
+        solo hace rollback si se propaga una excepción, no ante un `return`
+        normal. Un carrito de 2 ítems donde el segundo fallaba en el PASO 2
+        (precio inválido) dejaba el primero matriculado pese al mensaje de
+        error. Ahora los errores se señalizan con una excepción interna para
+        que la transacción SIEMPRE haga rollback si no se completa el lote.
 """
 
 import asyncpg
@@ -33,6 +46,14 @@ from models.enrollment import (
 )
 
 ESTADOS_ACTIVOS = ("pendiente", "aceptado", "finalizado")
+
+
+class _RegistroInvalido(Exception):
+    """C-13: error de validación de negocio dentro de create_enrollment.
+
+    Se usa en vez de `return` para que la transacción haga rollback de
+    cualquier ítem ya insertado en el mismo lote antes de reportar el error.
+    """
 
 
 # =====================================================================
@@ -373,172 +394,185 @@ async def create_enrollment(student_id: int, data: EnrollmentCreate, db: asyncpg
     C-01: toda la operación va dentro de una única transacción. Antes, si
     fallaba el tercer ítem de un envío de cuatro, los dos primeros quedaban
     ya insertados en la base de datos.
+    C-12/C-13: ver notas en el docstring del módulo.
     """
-    async with db.transaction():
+    try:
+        async with db.transaction():
 
-        # ---------- PASO 1: validación previa de todos los ítems ----------
-        for item in data.items:
-            tipo = item.type.value
+            # ---------- PASO 1: validación previa de todos los ítems ----------
+            for item in data.items:
+                tipo = item.type.value
 
-            if tipo == "course":
-                existente = await db.fetchrow(
-                    """SELECT c.name AS course_name, co.group_label
-                         FROM enrollments e
-                         JOIN course_offerings co ON e.course_offering_id = co.id
-                         JOIN courses c ON co.course_id = c.id
-                        WHERE e.student_id = $1
-                          AND e.course_offering_id = $2
-                          AND e.status = ANY($3::text[])""",
-                    student_id, item.id, list(ESTADOS_ACTIVOS),
+                if tipo == "course":
+                    existente = await db.fetchrow(
+                        """SELECT c.name AS course_name, co.group_label
+                             FROM enrollments e
+                             JOIN course_offerings co ON e.course_offering_id = co.id
+                             JOIN courses c ON co.course_id = c.id
+                            WHERE e.student_id = $1
+                              AND e.course_offering_id = $2
+                              AND e.status = ANY($3::text[])""",
+                        student_id, item.id, list(ESTADOS_ACTIVOS),
+                    )
+                    if existente:
+                        nombre = existente["course_name"]
+                        if existente["group_label"]:
+                            nombre += f" (Grupo {existente['group_label']})"
+                        raise _RegistroInvalido(f"Ya tienes una matrícula activa en el curso {nombre}. "
+                                                 f"Revisa tu selección.")
+
+                    en_paquete = await db.fetchrow(
+                        """SELECT c.name AS course_name, p.name AS package_name, co.group_label
+                             FROM enrollments e
+                             JOIN package_offerings po ON e.package_offering_id = po.id
+                             JOIN packages p ON po.package_id = p.id
+                             JOIN package_offering_courses poc ON poc.package_offering_id = po.id
+                             JOIN course_offerings co ON poc.course_offering_id = co.id
+                             JOIN courses c ON co.course_id = c.id
+                            WHERE e.student_id = $1
+                              AND e.status = ANY($2::text[])
+                              AND co.id = $3""",
+                        student_id, list(ESTADOS_ACTIVOS), item.id,
+                    )
+                    if en_paquete:
+                        nombre = en_paquete["course_name"]
+                        if en_paquete["group_label"]:
+                            nombre += f" (Grupo {en_paquete['group_label']})"
+                        # Mensaje diferenciado del duplicado simple (SEM-05).
+                        raise _RegistroInvalido(
+                            f"El curso {nombre} ya está incluido en el paquete "
+                            f"«{en_paquete['package_name']}» en el que estás matriculado, "
+                            f"por lo que no necesitas matricularte por separado.")
+
+                else:  # package
+                    existente = await db.fetchrow(
+                        """SELECT p.name AS package_name, po.group_label
+                             FROM enrollments e
+                             JOIN package_offerings po ON e.package_offering_id = po.id
+                             JOIN packages p ON po.package_id = p.id
+                            WHERE e.student_id = $1
+                              AND e.package_offering_id = $2
+                              AND e.status = ANY($3::text[])""",
+                        student_id, item.id, list(ESTADOS_ACTIVOS),
+                    )
+                    if existente:
+                        nombre = existente["package_name"]
+                        if existente["group_label"]:
+                            nombre += f" (Grupo {existente['group_label']})"
+                        raise _RegistroInvalido(f"Ya tienes una matrícula activa en el paquete {nombre}. "
+                                                 f"Revisa tu selección.")
+
+                    conflicto = await db.fetchrow(
+                        """SELECT c.name AS course_name, co.group_label
+                             FROM package_offering_courses poc
+                             JOIN course_offerings co ON poc.course_offering_id = co.id
+                             JOIN courses c ON co.course_id = c.id
+                             JOIN enrollments e ON e.course_offering_id = co.id
+                            WHERE poc.package_offering_id = $1
+                              AND e.student_id = $2
+                              AND e.status = ANY($3::text[])
+                            LIMIT 1""",
+                        item.id, student_id, list(ESTADOS_ACTIVOS),
+                    )
+                    if conflicto:
+                        nombre = conflicto["course_name"]
+                        if conflicto["group_label"]:
+                            nombre += f" (Grupo {conflicto['group_label']})"
+                        raise _RegistroInvalido(
+                            f"Este paquete incluye el curso {nombre}, en el que ya estás "
+                            f"matriculado de forma individual. Cancela esa matrícula "
+                            f"antes de contratar el paquete.")
+
+                # C-11: control de aforo
+                libres = await _plazas_disponibles(db, tipo, item.id)
+                if libres is not None and libres <= 0:
+                    raise _RegistroInvalido("Una de las ofertas seleccionadas ya no tiene plazas disponibles.")
+
+            # ---------- PASO 2: creación ----------
+            creadas = []
+            for item in data.items:
+                tipo = item.type.value
+
+                if tipo == "course":
+                    oferta = await db.fetchrow(
+                        """SELECT COALESCE(co.price_override, c.base_price) AS price
+                             FROM course_offerings co
+                             JOIN courses c ON co.course_id = c.id
+                            WHERE co.id = $1""",
+                        item.id,
+                    )
+                else:
+                    oferta = await db.fetchrow(
+                        """SELECT COALESCE(po.price_override, p.base_price) AS price
+                             FROM package_offerings po
+                             JOIN packages p ON po.package_id = p.id
+                            WHERE po.id = $1""",
+                        item.id,
+                    )
+
+                # C-02: antes -> `price = oferta['price'] if oferta else 0`.
+                # Una oferta inexistente o sin precio generaba una matrícula de
+                # S/ 0.00 con una cuota de S/ 0.00 que se aprobaba sola.
+                if oferta is None:
+                    raise _RegistroInvalido("Una de las ofertas seleccionadas ya no está disponible. "
+                                             "Actualiza la página e inténtalo de nuevo.")
+                precio = oferta["price"]
+                if precio is None or float(precio) <= 0:
+                    raise _RegistroInvalido("Una de las ofertas seleccionadas no tiene un precio configurado. "
+                                             "Comunícate con la administración.")
+
+                if tipo == "course":
+                    nueva = await db.fetchrow(
+                        """INSERT INTO enrollments
+                             (student_id, course_offering_id, enrollment_type, status)
+                           VALUES ($1, $2, 'course', 'pendiente') RETURNING id""",
+                        student_id, item.id,
+                    )
+                else:
+                    nueva = await db.fetchrow(
+                        """INSERT INTO enrollments
+                             (student_id, package_offering_id, enrollment_type, status)
+                           VALUES ($1, $2, 'package', 'pendiente') RETURNING id""",
+                        student_id, item.id,
+                    )
+
+                enrollment_id = nueva["id"]
+                await registrar_cambio_estado(
+                    db, enrollment_id, None, "pendiente",
+                    student_id, "student", "Alta de matrícula",
                 )
-                if existente:
-                    nombre = existente["course_name"]
-                    if existente["group_label"]:
-                        nombre += f" (Grupo {existente['group_label']})"
-                    return {"error": f"Ya tienes una matrícula activa en el curso {nombre}. "
-                                     f"Revisa tu selección."}
 
-                en_paquete = await db.fetchrow(
-                    """SELECT c.name AS course_name, p.name AS package_name, co.group_label
-                         FROM enrollments e
-                         JOIN package_offerings po ON e.package_offering_id = po.id
-                         JOIN packages p ON po.package_id = p.id
-                         JOIN package_offering_courses poc ON poc.package_offering_id = po.id
-                         JOIN course_offerings co ON poc.course_offering_id = co.id
-                         JOIN courses c ON co.course_id = c.id
-                        WHERE e.student_id = $1
-                          AND e.status = ANY($2::text[])
-                          AND co.id = $3""",
-                    student_id, list(ESTADOS_ACTIVOS), item.id,
+                plan = await db.fetchrow(
+                    """INSERT INTO payment_plans (enrollment_id, total_amount, installments)
+                       VALUES ($1, $2, 1) RETURNING id""",
+                    enrollment_id, precio,
                 )
-                if en_paquete:
-                    nombre = en_paquete["course_name"]
-                    if en_paquete["group_label"]:
-                        nombre += f" (Grupo {en_paquete['group_label']})"
-                    # C-13: mensaje diferenciado del duplicado simple.
-                    return {"error": f"El curso {nombre} ya está incluido en el paquete "
-                                     f"«{en_paquete['package_name']}» en el que estás matriculado, "
-                                     f"por lo que no necesitas matricularte por separado."}
-
-            else:  # package
-                existente = await db.fetchrow(
-                    """SELECT p.name AS package_name, po.group_label
-                         FROM enrollments e
-                         JOIN package_offerings po ON e.package_offering_id = po.id
-                         JOIN packages p ON po.package_id = p.id
-                        WHERE e.student_id = $1
-                          AND e.package_offering_id = $2
-                          AND e.status = ANY($3::text[])""",
-                    student_id, item.id, list(ESTADOS_ACTIVOS),
-                )
-                if existente:
-                    nombre = existente["package_name"]
-                    if existente["group_label"]:
-                        nombre += f" (Grupo {existente['group_label']})"
-                    return {"error": f"Ya tienes una matrícula activa en el paquete {nombre}. "
-                                     f"Revisa tu selección."}
-
-                conflicto = await db.fetchrow(
-                    """SELECT c.name AS course_name, co.group_label
-                         FROM package_offering_courses poc
-                         JOIN course_offerings co ON poc.course_offering_id = co.id
-                         JOIN courses c ON co.course_id = c.id
-                         JOIN enrollments e ON e.course_offering_id = co.id
-                        WHERE poc.package_offering_id = $1
-                          AND e.student_id = $2
-                          AND e.status = ANY($3::text[])
-                        LIMIT 1""",
-                    item.id, student_id, list(ESTADOS_ACTIVOS),
-                )
-                if conflicto:
-                    nombre = conflicto["course_name"]
-                    if conflicto["group_label"]:
-                        nombre += f" (Grupo {conflicto['group_label']})"
-                    return {"error": f"Este paquete incluye el curso {nombre}, en el que ya estás "
-                                     f"matriculado de forma individual. Cancela esa matrícula "
-                                     f"antes de contratar el paquete."}
-
-            # C-11: control de aforo
-            libres = await _plazas_disponibles(db, tipo, item.id)
-            if libres is not None and libres <= 0:
-                return {"error": "Una de las ofertas seleccionadas ya no tiene plazas disponibles."}
-
-        # ---------- PASO 2: creación ----------
-        creadas = []
-        for item in data.items:
-            tipo = item.type.value
-
-            if tipo == "course":
-                oferta = await db.fetchrow(
-                    """SELECT COALESCE(co.price_override, c.base_price) AS price
-                         FROM course_offerings co
-                         JOIN courses c ON co.course_id = c.id
-                        WHERE co.id = $1""",
-                    item.id,
-                )
-            else:
-                oferta = await db.fetchrow(
-                    """SELECT COALESCE(po.price_override, p.base_price) AS price
-                         FROM package_offerings po
-                         JOIN packages p ON po.package_id = p.id
-                        WHERE po.id = $1""",
-                    item.id,
+                vencimiento = date.today() + timedelta(days=7)
+                cuota = await db.fetchrow(
+                    """INSERT INTO installments
+                         (payment_plan_id, installment_number, due_date, amount, status)
+                       VALUES ($1, 1, $2, $3, 'pending') RETURNING id""",
+                    plan["id"], vencimiento, precio,
                 )
 
-            # C-02: antes -> `price = oferta['price'] if oferta else 0`.
-            # Una oferta inexistente o sin precio generaba una matrícula de
-            # S/ 0.00 con una cuota de S/ 0.00 que se aprobaba sola.
-            if oferta is None:
-                return {"error": "Una de las ofertas seleccionadas ya no está disponible. "
-                                 "Actualiza la página e inténtalo de nuevo."}
-            precio = oferta["price"]
-            if precio is None or float(precio) <= 0:
-                return {"error": "Una de las ofertas seleccionadas no tiene un precio configurado. "
-                                 "Comunícate con la administración."}
+                creadas.append({
+                    "enrollmentId": enrollment_id,
+                    "payment_plan_id": plan["id"],
+                    "installment_id": cuota["id"],
+                    "amount": float(precio),
+                    "due_date": vencimiento.isoformat(),
+                })
 
-            if tipo == "course":
-                nueva = await db.fetchrow(
-                    """INSERT INTO enrollments
-                         (student_id, course_offering_id, enrollment_type, status)
-                       VALUES ($1, $2, 'course', 'pendiente') RETURNING id""",
-                    student_id, item.id,
-                )
-            else:
-                nueva = await db.fetchrow(
-                    """INSERT INTO enrollments
-                         (student_id, package_offering_id, enrollment_type, status)
-                       VALUES ($1, $2, 'package', 'pendiente') RETURNING id""",
-                    student_id, item.id,
-                )
+            return {"message": "Matrículas registradas correctamente", "created": creadas}
 
-            enrollment_id = nueva["id"]
-            await registrar_cambio_estado(
-                db, enrollment_id, None, "pendiente",
-                student_id, "student", "Alta de matrícula",
-            )
-
-            plan = await db.fetchrow(
-                """INSERT INTO payment_plans (enrollment_id, total_amount, installments)
-                   VALUES ($1, $2, 1) RETURNING id""",
-                enrollment_id, precio,
-            )
-            vencimiento = date.today() + timedelta(days=7)
-            cuota = await db.fetchrow(
-                """INSERT INTO installments
-                     (payment_plan_id, installment_number, due_date, amount, status)
-                   VALUES ($1, 1, $2, $3, 'pending') RETURNING id""",
-                plan["id"], vencimiento, precio,
-            )
-
-            creadas.append({
-                "enrollmentId": enrollment_id,
-                "payment_plan_id": plan["id"],
-                "installment_id": cuota["id"],
-                "amount": float(precio),
-                "due_date": vencimiento.isoformat(),
-            })
-
-        return {"message": "Matrículas registradas correctamente", "created": creadas}
+    except _RegistroInvalido as e:
+        return {"error": str(e)}
+    except asyncpg.UniqueViolationError:
+        # C-12: otra petición concurrente ganó la carrera y ya matriculó al
+        # estudiante en el mismo curso/paquete entre el SELECT y el INSERT.
+        return {"error": "Ya tienes una matrícula activa en uno de los cursos o paquetes "
+                         "seleccionados. Actualiza la página; es posible que se haya "
+                         "registrado desde otra sesión."}
 
 
 # =====================================================================
