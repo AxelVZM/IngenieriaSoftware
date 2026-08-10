@@ -1,3 +1,5 @@
+# verify_teachers.py
+
 """
 Script para verificar la relación entre docentes y estudiantes
 Muestra cuántos estudiantes tiene cada docente según las matrículas aceptadas

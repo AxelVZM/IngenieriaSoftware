@@ -1,3 +1,5 @@
+# accept_enrollments.py
+
 """
 Script para aceptar todas las matrículas pendientes y aprobar pagos
 """

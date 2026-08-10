@@ -1,3 +1,5 @@
+# clear_db.py
+
 """
 Script para borrar TODOS los datos de la base de datos
 Usa TRUNCATE CASCADE para eliminar todo de forma directa

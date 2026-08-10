@@ -1,3 +1,5 @@
+# enroll_students.py
+
 """
 Script para matricular estudiantes en paquetes y subir comprobante de pago
 """
@@ -25,7 +27,7 @@ cloudinary.config(
     api_secret=os.getenv("CLOUDINARY_API_SECRET")
 )
 
-VOUCHER_PATH = r"C:\Users\Jacobo\Downloads\images.jpg"
+VOUCHER_PATH = r"C:\Users\Jacob\Downloads\images.jpg"
 
 async def main():
     conn = await asyncpg.connect(DATABASE_URL)

@@ -1,3 +1,5 @@
+# populate_db.py
+
 """
 Script para poblar la base de datos con datos de prueba
 Genera docentes, cursos, ofertas, paquetes y horarios
@@ -131,7 +133,7 @@ async def main():
                 """INSERT INTO cycles (name, start_date, end_date, duration_months, status)
                    VALUES ('Ciclo 2025-I', $1, $2, 6, 'open')
                    RETURNING id, name""",
-                date(2025, 3, 1), date(2025, 8, 31)
+                date(2027, 3, 1), date(2027, 8, 31)
             )
         
         cycle_id = cycle['id']

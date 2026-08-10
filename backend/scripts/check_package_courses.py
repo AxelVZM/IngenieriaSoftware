@@ -1,3 +1,5 @@
+# check_package_courses.py
+
 import asyncio
 import asyncpg
 import os

@@ -1,3 +1,5 @@
+# check_enrollment.py
+
 import asyncio
 import asyncpg
 import os

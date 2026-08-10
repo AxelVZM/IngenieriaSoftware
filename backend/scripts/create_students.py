@@ -1,3 +1,5 @@
+# create_students.py
+
 """
 Script para crear 20+ estudiantes de prueba
 Usa bcrypt para hashear contraseñas (mismo método que el sistema)
@@ -30,14 +32,14 @@ APELLIDOS = [
     "Castro", "Romero", "Ramos", "Medina", "Navarro", "Campos"
 ]
 
-PHONES = ["969728039", "970253943", "984618002", "949850422", "950132313"]
+PHONES = ["969728039", "956399615", "985121933", "952873813"]
 
 async def main():
     conn = await asyncpg.connect(DATABASE_URL)
     print("✅ Conectado a la base de datos")
     
     try:
-        num_students = 20
+        num_students = 5
         print(f"\n👨‍🎓 Creando {num_students} estudiantes...")
         
         created = 0

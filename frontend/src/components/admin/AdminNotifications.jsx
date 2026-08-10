@@ -21,6 +21,12 @@ import {
   TextField,
   MenuItem,
   Grid,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Chip,
 } from "@mui/material";
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -48,11 +54,20 @@ export default function AdminNotifications() {
   const [message, setMessage] = useState(null);
   const [qrRefreshCount, setQrRefreshCount] = useState(0);
 
+  // Confirmation Modal state
+  const [confirmModal, setConfirmModal] = useState({
+    open: false,
+    title: '',
+    content: '',
+    onConfirm: null,
+  });
+
   // Payment notifications state
   const [rejectedPayments, setRejectedPayments] = useState([]);
   const [acceptedPayments, setAcceptedPayments] = useState([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
   const [sendingNotifications, setSendingNotifications] = useState(false);
+  const [failedNotifications, setFailedNotifications] = useState([]);
 
   // Attendance notifications state
   const [cycles, setCycles] = useState([]);
@@ -76,10 +91,26 @@ export default function AdminNotifications() {
     }
   }, [qrCode, loggedIn, qrRefreshCount]);
 
-  // Load cycles on mount
+  // Load cycles and check active WhatsApp session on mount
   useEffect(() => {
     loadCycles();
+    checkActiveSession();
   }, []);
+
+  const checkActiveSession = async () => {
+    try {
+      const response = await notificationsAPI.verifyWhatsApp();
+      if (response && response.logged_in) {
+        setLoggedIn(true);
+        setMessage({
+          type: "success",
+          text: "✓ Sesión activa de WhatsApp verificada automáticamente.",
+        });
+      }
+    } catch (error) {
+      // Quiet fail if no active session
+    }
+  };
 
   // Update date range when cycle changes
   useEffect(() => {
@@ -238,53 +269,64 @@ export default function AdminNotifications() {
     }
   };
 
-  const handleSendNotifications = async (type, payments) => {
+  const requestSendPaymentNotifications = (type, payments) => {
     if (!loggedIn) {
       setMessage({
         type: "error",
-        text: "Debes iniciar sesión en WhatsApp primero",
+        text: "Debes iniciar sesión en WhatsApp antes de enviar notificaciones.",
       });
       return;
     }
 
     if (payments.length === 0) {
-      setMessage({ type: "error", text: "No hay pagos para notificar" });
+      setMessage({ type: "error", text: "No hay pagos registrados para notificar." });
       return;
     }
 
-    if (!window.confirm(`¿Enviar ${payments.length} notificaciones?`)) {
-      return;
-    }
+    const typeLabel = type === "rejected" ? "rechazados" : "aceptados";
+    setConfirmModal({
+      open: true,
+      title: "Confirmar Envío Masivo de Notificaciones",
+      content: `¿Está seguro de enviar ${payments.length} notificaciones de pagos ${typeLabel} a WhatsApp? Este proceso automatizado enviará los mensajes a través de la sesión de WhatsApp Web.`,
+      onConfirm: () => executeSendPaymentNotifications(type, payments),
+    });
+  };
 
+  const executeSendPaymentNotifications = async (type, payments) => {
+    setConfirmModal((prev) => ({ ...prev, open: false }));
     setSendingNotifications(true);
     setMessage(null);
+    setFailedNotifications([]);
 
     try {
-      const response = await notificationsAPI.sendPaymentNotifications(
-        type,
-        payments
-      );
+      const response = await notificationsAPI.sendPaymentNotifications(type, payments);
 
-      const successCount = response.results.filter(
-        (r) => r.status === "success"
-      ).length;
-      const errorCount = response.results.filter(
-        (r) => r.status === "error"
-      ).length;
+      const successCount = response.results.filter((r) => r.status === "success").length;
+      const failed = response.results.filter((r) => r.status === "error");
 
-      setMessage({
-        type: successCount > 0 ? "success" : "error",
-        text: `✓ ${successCount} enviados, ✗ ${errorCount} fallidos`,
-      });
+      setFailedNotifications(failed);
 
-      // Clear the list after sending
-      if (type === "rejected") {
-        setRejectedPayments([]);
+      if (failed.length > 0) {
+        setMessage({
+          type: "warning",
+          text: `⚠️ Proceso finalizado: ${successCount} enviados exitosamente, ${failed.length} fallidos. Verifique el detalle en rojo abajo.`,
+        });
       } else {
-        setAcceptedPayments([]);
+        setMessage({
+          type: "success",
+          text: `✓ Notificaciones enviadas exitosamente (${successCount} mensajes).`,
+        });
+      }
+
+      if (failed.length === 0) {
+        if (type === "rejected") {
+          setRejectedPayments([]);
+        } else {
+          setAcceptedPayments([]);
+        }
       }
     } catch (error) {
-      setMessage({ type: "error", text: `Error: ${error.message}` });
+      setMessage({ type: "error", text: `Error al enviar notificaciones: ${error.message}` });
     } finally {
       setSendingNotifications(false);
     }
@@ -321,25 +363,31 @@ export default function AdminNotifications() {
     }
   };
 
-  const handleSendAttendanceNotifications = async () => {
+  const requestSendAttendanceNotifications = () => {
     if (!loggedIn) {
-      setMessage({ type: 'error', text: 'Debes iniciar sesión en WhatsApp primero' });
+      setMessage({ type: 'error', text: 'Debes iniciar sesión en WhatsApp antes de enviar notificaciones.' });
       return;
     }
 
     const withPhone = attendanceStudents.filter(s => s.phone_to_use).length;
     if (withPhone === 0) {
-      setMessage({ type: 'error', text: 'No hay estudiantes con teléfono para notificar' });
+      setMessage({ type: 'error', text: 'No hay estudiantes con número de teléfono disponible para notificar.' });
       return;
     }
 
     const withoutPhone = attendanceStudents.length - withPhone;
-    const confirmMsg = `¿Enviar ${withPhone} notificaciones?${withoutPhone > 0 ? ` (${withoutPhone} sin teléfono serán omitidos)` : ''}`;
+    const detailsText = withoutPhone > 0 ? ` (${withoutPhone} estudiante(s) sin teléfono registrado serán omitidos)` : '';
 
-    if (!window.confirm(confirmMsg)) {
-      return;
-    }
+    setConfirmModal({
+      open: true,
+      title: "Confirmar Envío de Ausencias por WhatsApp",
+      content: `¿Está seguro de enviar ${withPhone} notificaciones de ausencia por WhatsApp?${detailsText}`,
+      onConfirm: () => executeSendAttendanceNotifications(),
+    });
+  };
 
+  const executeSendAttendanceNotifications = async () => {
+    setConfirmModal((prev) => ({ ...prev, open: false }));
     setSendingAttendance(true);
     setMessage(null);
 
@@ -352,14 +400,12 @@ export default function AdminNotifications() {
 
       setMessage({
         type: result.success > 0 ? 'success' : 'error',
-        text: `✓ ${result.success} enviados, ✗ ${result.errors} fallidos`
+        text: `✓ ${result.success} notificaciones de ausencia enviadas, ${result.errors} fallidas.`
       });
 
-      // Clear list after sending
       setAttendanceStudents([]);
-      setSelectedGroup('');
     } catch (error) {
-      setMessage({ type: 'error', text: `Error: ${error.message}` });
+      setMessage({ type: 'error', text: `Error al enviar notificaciones: ${error.message}` });
     } finally {
       setSendingAttendance(false);
     }
@@ -549,7 +595,7 @@ export default function AdminNotifications() {
                   variant="contained"
                   color="error"
                   onClick={() =>
-                    handleSendNotifications("rejected", rejectedPayments)
+                    requestSendPaymentNotifications("rejected", rejectedPayments)
                   }
                   disabled={!loggedIn || sendingNotifications}
                   startIcon={
@@ -561,6 +607,21 @@ export default function AdminNotifications() {
                     : "Enviar Notificaciones"}
                 </Button>
               </>
+            )}
+
+            {failedNotifications.length > 0 && (
+              <Alert severity="error" sx={{ mt: 3 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  ❌ Detalle de envíos fallidos ({failedNotifications.length}):
+                </Typography>
+                <Box component="ul" sx={{ margin: 0, paddingLeft: 3 }}>
+                  {failedNotifications.map((fail, idx) => (
+                    <li key={idx}>
+                      <strong>{fail.student || fail.phone || "Estudiante"}:</strong> {fail.phone ? `(${fail.phone})` : ""} — {fail.message || "Error al entregar el mensaje de WhatsApp"}
+                    </li>
+                  ))}
+                </Box>
+              </Alert>
             )}
           </CardContent>
         </Card>
@@ -629,7 +690,7 @@ export default function AdminNotifications() {
                   variant="contained"
                   color="success"
                   onClick={() =>
-                    handleSendNotifications("accepted", acceptedPayments)
+                    requestSendPaymentNotifications("accepted", acceptedPayments)
                   }
                   disabled={!loggedIn || sendingNotifications}
                   startIcon={
@@ -641,6 +702,21 @@ export default function AdminNotifications() {
                     : "Enviar Notificaciones"}
                 </Button>
               </>
+            )}
+
+            {failedNotifications.length > 0 && (
+              <Alert severity="error" sx={{ mt: 3 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  ❌ Detalle de envíos fallidos ({failedNotifications.length}):
+                </Typography>
+                <Box component="ul" sx={{ margin: 0, paddingLeft: 3 }}>
+                  {failedNotifications.map((fail, idx) => (
+                    <li key={idx}>
+                      <strong>{fail.student || fail.phone || "Estudiante"}:</strong> {fail.phone ? `(${fail.phone})` : ""} — {fail.message || "Error al entregar el mensaje de WhatsApp"}
+                    </li>
+                  ))}
+                </Box>
+              </Alert>
             )}
           </CardContent>
         </Card>
@@ -768,7 +844,7 @@ export default function AdminNotifications() {
                 <Button
                   variant="contained"
                   color="primary"
-                  onClick={handleSendAttendanceNotifications}
+                  onClick={requestSendAttendanceNotifications}
                   disabled={!loggedIn || sendingAttendance || attendanceStudents.filter(s => s.phone_to_use).length === 0}
                   startIcon={sendingAttendance && <CircularProgress size={20} />}
                 >
@@ -779,6 +855,37 @@ export default function AdminNotifications() {
           </CardContent>
         </Card>
       </TabPanel>
+
+      {/* Modal de Confirmación UI/UX */}
+      <Dialog
+        open={confirmModal.open}
+        onClose={() => setConfirmModal({ ...confirmModal, open: false })}
+      >
+        <DialogTitle sx={{ fontWeight: 'bold' }}>
+          {confirmModal.title}
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ pt: 1 }}>
+            {confirmModal.content}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            onClick={() => setConfirmModal({ ...confirmModal, open: false })}
+            color="inherit"
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={confirmModal.onConfirm}
+            autoFocus
+          >
+            Confirmar Envío
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
