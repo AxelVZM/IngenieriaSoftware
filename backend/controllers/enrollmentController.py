@@ -390,12 +390,6 @@ async def get_admin_enrollments(db: asyncpg.Connection):
 # =====================================================================
 
 async def create_enrollment(student_id: int, data: EnrollmentCreate, db: asyncpg.Connection):
-    """
-    C-01: toda la operación va dentro de una única transacción. Antes, si
-    fallaba el tercer ítem de un envío de cuatro, los dos primeros quedaban
-    ya insertados en la base de datos.
-    C-12/C-13: ver notas en el docstring del módulo.
-    """
     try:
         async with db.transaction():
 
@@ -438,7 +432,6 @@ async def create_enrollment(student_id: int, data: EnrollmentCreate, db: asyncpg
                         nombre = en_paquete["course_name"]
                         if en_paquete["group_label"]:
                             nombre += f" (Grupo {en_paquete['group_label']})"
-                        # Mensaje diferenciado del duplicado simple (SEM-05).
                         raise _RegistroInvalido(
                             f"El curso {nombre} ya está incluido en el paquete "
                             f"«{en_paquete['package_name']}» en el que estás matriculado, "
@@ -483,7 +476,6 @@ async def create_enrollment(student_id: int, data: EnrollmentCreate, db: asyncpg
                             f"matriculado de forma individual. Cancela esa matrícula "
                             f"antes de contratar el paquete.")
 
-                # C-11: control de aforo
                 libres = await _plazas_disponibles(db, tipo, item.id)
                 if libres is not None and libres <= 0:
                     raise _RegistroInvalido("Una de las ofertas seleccionadas ya no tiene plazas disponibles.")
@@ -510,9 +502,6 @@ async def create_enrollment(student_id: int, data: EnrollmentCreate, db: asyncpg
                         item.id,
                     )
 
-                # C-02: antes -> `price = oferta['price'] if oferta else 0`.
-                # Una oferta inexistente o sin precio generaba una matrícula de
-                # S/ 0.00 con una cuota de S/ 0.00 que se aprobaba sola.
                 if oferta is None:
                     raise _RegistroInvalido("Una de las ofertas seleccionadas ya no está disponible. "
                                              "Actualiza la página e inténtalo de nuevo.")
@@ -568,8 +557,6 @@ async def create_enrollment(student_id: int, data: EnrollmentCreate, db: asyncpg
     except _RegistroInvalido as e:
         return {"error": str(e)}
     except asyncpg.UniqueViolationError:
-        # C-12: otra petición concurrente ganó la carrera y ya matriculó al
-        # estudiante en el mismo curso/paquete entre el SELECT y el INSERT.
         return {"error": "Ya tienes una matrícula activa en uno de los cursos o paquetes "
                          "seleccionados. Actualiza la página; es posible que se haya "
                          "registrado desde otra sesión."}
