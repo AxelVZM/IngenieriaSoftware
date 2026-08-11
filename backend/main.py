@@ -121,13 +121,25 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """Convierte los errores 422 de Pydantic en un mensaje legible."""
+    """
+    Convierte los errores 422 de Pydantic en un mensaje legible.
+
+    Además del texto ya armado se envía `errors`, con el campo y el mensaje
+    por separado. El nombre del campo aquí es el identificador interno
+    (`base_price`, `duration_months`), que no se le debe mostrar al usuario:
+    es el frontend quien lo traduce a una etiqueta legible, porque es el que
+    sabe cómo se llama ese campo en cada formulario. Sin esta parte
+    estructurada el cliente solo recibía la cadena ya formateada y no le
+    quedaba más remedio que enseñar el nombre de la variable.
+    """
     errores = []
+    detalles = []
     for err in exc.errors():
         campo = ".".join(str(p) for p in err.get("loc", []) if p not in ("body", "query"))
         mensaje = err.get("msg", "valor invalido")
         mensaje = mensaje.replace("Value error, ", "")
         errores.append(f"{campo}: {mensaje}" if campo else mensaje)
+        detalles.append({"field": campo, "message": mensaje})
 
     return JSONResponse(
         status_code=422,
@@ -136,6 +148,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
                 "code": "VALIDATION_ERROR",
                 "message": " | ".join(errores) or "Datos inválidos.",
                 "fields": errores,
+                "errors": detalles,
             }
         },
     )

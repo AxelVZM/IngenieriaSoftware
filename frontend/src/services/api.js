@@ -53,7 +53,20 @@ const ETIQUETAS_CAMPO = {
   price_override: 'Precio de la oferta',
   course_id: 'Curso',
   cycle_id: 'Ciclo',
+  // Horarios: se editan desde la ficha de la oferta, así que sus errores
+  // aparecen en los mismos formularios.
+  course_offering_id: 'Oferta',
+  day_of_week: 'Día de la semana',
+  start_time: 'Hora de inicio',
+  end_time: 'Hora de fin',
+  classroom: 'Aula',
 };
+
+/** Etiqueta legible de un campo; acepta rutas anidadas como "body.base_price". */
+function etiquetaDeCampo(campo) {
+  const hoja = String(campo ?? '').split('.').filter(Boolean).pop();
+  return ETIQUETAS_CAMPO[hoja] ?? hoja ?? '';
+}
 
 /**
  * Traduce un mensaje de Pydantic. Devuelve además si era genérico: los
@@ -99,7 +112,7 @@ function extractErrorMessage(data, response) {
           : null;
 
         if (!campo || !generico) return texto;
-        return `${ETIQUETAS_CAMPO[campo] ?? campo}: ${texto}`;
+        return `${etiquetaDeCampo(campo)}: ${texto}`;
       })
       .filter(Boolean);
 
@@ -114,15 +127,51 @@ function extractErrorMessage(data, response) {
 }
 
 /**
+ * Arma el texto de un 422 a partir de los errores ya separados en campo y
+ * mensaje que envía el manejador global del backend.
+ *
+ * El backend nombra los campos con su identificador interno (`base_price`,
+ * `duration_months`, `day_of_week`). Mostrárselos al usuario es un defecto de
+ * usabilidad: aquí se cambian por la etiqueta del formulario y se traducen los
+ * mensajes que Pydantic emite en inglés. Los mensajes de nuestros propios
+ * validadores ya nombran el campo en español, así que no se les antepone nada.
+ */
+function formatearErroresDeValidacion(errores) {
+  if (!Array.isArray(errores) || !errores.length) return null;
+
+  const mensajes = errores
+    .map((item) => {
+      const crudo = String(item?.message ?? '').replace(/^Value error,\s*/i, '');
+      if (!crudo) return '';
+      const { texto, generico } = traducirMensaje(crudo);
+      const etiqueta = etiquetaDeCampo(item?.field);
+
+      if (!etiqueta || !generico) return texto;
+      return `${etiqueta}: ${texto}`;
+    })
+    .filter(Boolean);
+
+  return mensajes.length ? mensajes.join(' · ') : null;
+}
+
+/**
  * Extrae el mensaje del cuerpo de error, soportando:
- *  - Formato nuevo: { detail: { code, message, fields } }
+ *  - Formato nuevo: { detail: { code, message, fields, errors } }
  *  - Formato antiguo: { detail: "texto" } o { error: "texto" }
  */
 function parseErrorBody(body, status, response) {
   const detail = body?.detail;
 
   if (detail && typeof detail === "object" && !Array.isArray(detail)) {
-    return new ApiError(detail.message || "Error en la petición", {
+    // Los 422 traen `errors` con el campo aparte: se rearma el texto para no
+    // enseñar el nombre de la variable. Si no viene (backend antiguo), se cae
+    // al `message` ya formateado.
+    const mensaje =
+      formatearErroresDeValidacion(detail.errors) ||
+      detail.message ||
+      "Error en la petición";
+
+    return new ApiError(mensaje, {
       code: detail.code || "HTTP_ERROR",
       status,
       fields: detail.fields || [],
