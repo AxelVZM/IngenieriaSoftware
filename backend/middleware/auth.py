@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 
 import asyncpg
-from fastapi import Depends, Request
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from config.database import get_db
@@ -23,6 +23,13 @@ logger = logging.getLogger(__name__)
 security = HTTPBearer(auto_error=False)
 
 _WWW_AUTH = {"WWW-Authenticate": "Bearer"}
+
+
+CREDENCIALES_INVALIDAS = HTTPException(
+    status_code=status.HTTP_401_UNAUTHORIZED,
+    detail="Tu sesión no es válida o ha expirado. Inicia sesión nuevamente.",
+    headers={"WWW-Authenticate": "Bearer"},
+)
 
 
 async def get_current_user(
@@ -57,13 +64,23 @@ async def get_current_user(
             401, "TOKEN_INVALID", "Sesión inválida. Inicia sesión nuevamente.", headers=_WWW_AUTH
         )
 
-    user_id = payload["id"]
-    role = payload["role"]
+    if not payload:
+        raise api_error(
+            401, "TOKEN_INVALID", "Sesión inválida. Inicia sesión nuevamente.", headers=_WWW_AUTH
+        )
+
+    user_id = payload.get("id")
+    role = payload.get("role")
+
+    if user_id is None or role is None:
+        raise api_error(
+            401, "TOKEN_INVALID", "Sesión inválida. Inicia sesión nuevamente.", headers=_WWW_AUTH
+        )
 
     try:
         if role == "student":
             student = await db.fetchrow(
-                "SELECT id, dni FROM students WHERE id = $1", user_id
+                "SELECT id, dni, first_name, last_name FROM students WHERE id = $1", user_id
             )
             if student:
                 return {
@@ -71,6 +88,8 @@ async def get_current_user(
                     "username": student["dni"],
                     "role": "student",
                     "related_id": None,
+                    "first_name": student["first_name"],
+                    "last_name": student["last_name"],
                 }
             # Si el rol dice student pero no existe, no se sigue buscando en
             # users: eso permitiria escalar privilegios con un id coincidente.

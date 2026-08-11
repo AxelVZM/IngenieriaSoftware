@@ -1,8 +1,5 @@
-// src/services/api.js
-// Servicio centralizado para manejar todas las peticiones API
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:4000/api";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
+const TIEMPO_MAXIMO_MS = 20000;
 
 // Códigos que significan "la sesión ya no sirve" -> cerrar sesión local
 const SESSION_ERROR_CODES = [
@@ -31,12 +28,32 @@ function clearSession() {
   localStorage.removeItem("user");
 }
 
+function extraerMensaje(data, response) {
+  if (!data) {
+    return response?.status >= 500
+      ? "El servidor no está disponible. Inténtalo de nuevo en unos minutos."
+      : "No se pudo completar la operación.";
+  }
+
+  const detalle = data.detail ?? data.error ?? data.message;
+
+  if (Array.isArray(detalle)) {
+    return detalle
+      .map((d) => (typeof d === "string" ? d : d.msg || JSON.stringify(d)))
+      .join(". ");
+  }
+  if (detalle && typeof detalle === "object") {
+    return detalle.msg || detalle.message || JSON.stringify(detalle);
+  }
+  return detalle || "No se pudo completar la operación.";
+}
+
 /**
  * Extrae el mensaje del cuerpo de error, soportando:
  *  - Formato nuevo: { detail: { code, message, fields } }
  *  - Formato antiguo: { detail: "texto" } o { error: "texto" }
  */
-function parseErrorBody(body, status) {
+function parseErrorBody(body, status, response) {
   const detail = body?.detail;
 
   if (detail && typeof detail === "object" && !Array.isArray(detail)) {
@@ -47,12 +64,7 @@ function parseErrorBody(body, status) {
     });
   }
 
-  const message =
-    (typeof detail === "string" && detail) ||
-    body?.message ||
-    body?.error ||
-    "Error en la petición";
-
+  const message = extraerMensaje(body, response);
   return new ApiError(message, { code: "HTTP_ERROR", status });
 }
 
@@ -69,22 +81,30 @@ async function request(endpoint, options = {}) {
     },
   };
 
-  // Si hay FormData, eliminar Content-Type para que el browser lo establezca
   if (options.body instanceof FormData) {
     delete config.headers["Content-Type"];
   }
 
+  const controlador = new AbortController();
+  const temporizador = setTimeout(() => controlador.abort(), TIEMPO_MAXIMO_MS);
+  config.signal = controlador.signal;
+
   let response;
   try {
     response = await fetch(`${API_BASE_URL}${endpoint}`, config);
-  } catch (networkError) {
-    // fetch solo falla así cuando no hay red o el servidor no responde
-    console.error("Network Error:", networkError);
-    throw new ApiError(
-      "No se pudo conectar con el servidor. Revisa tu conexión.",
-      { code: "NETWORK_ERROR" }
-    );
+  } catch (err) {
+    clearTimeout(temporizador);
+    if (err.name === "AbortError") {
+      throw new ApiError("El servidor tardó demasiado en responder. Vuelve a intentarlo.", {
+        code: "TIMEOUT_ERROR",
+      });
+    }
+    console.error("Network Error:", err);
+    throw new ApiError("No se pudo conectar con el servidor. Revisa tu conexión.", {
+      code: "NETWORK_ERROR",
+    });
   }
+  clearTimeout(temporizador);
 
   // 204 No Content u otras respuestas sin cuerpo
   if (response.status === 204) return null;
@@ -100,7 +120,6 @@ async function request(endpoint, options = {}) {
   }
 
   if (!response.ok) {
-    // Si el backend devolvió algo que no es JSON (ej. HTML de un 502)
     if (body === null) {
       throw new ApiError(
         `Error del servidor (${response.status}). Intenta más tarde.`,
@@ -108,13 +127,13 @@ async function request(endpoint, options = {}) {
       );
     }
 
-    const error = parseErrorBody(body, response.status);
+    const error = parseErrorBody(body, response.status, response);
 
     // Sesión inválida o expirada: limpiar y mandar al login
-    if (response.status === 401 && SESSION_ERROR_CODES.includes(error.code)) {
+    if (response.status === 401 && (SESSION_ERROR_CODES.includes(error.code) || error.code === "HTTP_ERROR")) {
       clearSession();
       if (!window.location.pathname.startsWith("/login")) {
-        window.location.href = "/login";
+        window.location.href = "/login?expirada=1";
       }
     }
 
@@ -122,11 +141,7 @@ async function request(endpoint, options = {}) {
     throw error;
   }
 
-  // Red de seguridad para endpoints aún NO migrados al formato estándar.
-  // Algunos responden 200/201 pero con {"error": "..."} en el cuerpo, es decir,
-  // un fallo disfrazado de éxito (defecto BG-U1 en create_teacher). Sin esta
-  // comprobación la interfaz mostraría "creado correctamente" en un error.
-  // Cuando todos los controladores usen api_error(), este bloque sobra.
+  // Red de seguridad para endpoints con formato antiguo que retornan 200 con { error: "..." }
   if (body && typeof body === "object" && typeof body.error === "string") {
     const legacy = new ApiError(body.error, {
       code: "LEGACY_ERROR",
@@ -151,11 +166,11 @@ export const authAPI = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+  getMe: () => request("/auth/me"),
 };
 
 // API de estudiantes
 export const studentsAPI = {
-  // Se apunta a /auth/register para usar las validaciones reforzadas.
   register: (data) =>
     request("/auth/register", {
       method: "POST",
@@ -315,28 +330,34 @@ export const teachersAPI = {
 
 // API de matrículas
 export const enrollmentsAPI = {
-  getAll: (studentId = null) => {
-    const url = studentId
-      ? `/enrollments?student_id=${studentId}`
-      : "/enrollments";
-    return request(url);
-  },
+  getAll: (studentId = null) =>
+    request(studentId ? `/enrollments?student_id=${studentId}` : "/enrollments"),
+
   getAllAdmin: () => request("/enrollments/admin"),
+
   create: (items) =>
     request("/enrollments", {
       method: "POST",
       body: JSON.stringify({ items }),
     }),
-  updateStatus: (enrollmentId, status) =>
+
+  updateStatus: (enrollmentId, status, reason = null) =>
     request("/enrollments/status", {
       method: "PUT",
-      body: JSON.stringify({ enrollment_id: enrollmentId, status }),
+      body: JSON.stringify({ enrollment_id: enrollmentId, status, reason }),
     }),
-  cancel: (enrollmentId) =>
+
+  cancel: (enrollmentId, reason = null) =>
     request("/enrollments/cancel", {
       method: "POST",
-      body: JSON.stringify({ enrollment_id: enrollmentId }),
+      body: JSON.stringify({ enrollment_id: enrollmentId, reason }),
     }),
+
+  remove: (enrollmentId) =>
+    request(`/enrollments/${enrollmentId}`, { method: "DELETE" }),
+
+  getHistory: (enrollmentId) => request(`/enrollments/${enrollmentId}/history`),
+
   getByOffering: (type, id, status = "aceptado") => {
     const params = new URLSearchParams({ type, id, status });
     return request(`/enrollments/by-offering?${params.toString()}`);
@@ -373,7 +394,6 @@ export const paymentsAPI = {
 // API de horarios
 export const schedulesAPI = {
   getAll: () => request("/schedules"),
-  // Alias for backward compatibility with AdminSchedules component
   getByOffering: (courseOfferingId) =>
     request(`/schedules/offering/${courseOfferingId}`),
   getByCourseOffering: (courseOfferingId) =>
@@ -436,7 +456,6 @@ export const adminAPI = {
 
 // API de notificaciones
 export const notificationsAPI = {
-  // WhatsApp session
   initWhatsApp: () =>
     request("/notifications/whatsapp/init", { method: "POST" }),
   verifyWhatsApp: () =>
@@ -446,7 +465,6 @@ export const notificationsAPI = {
   closeWhatsApp: () =>
     request("/notifications/whatsapp/close", { method: "POST" }),
 
-  // Payment notifications
   getPaymentsRejected: () => request("/notifications/payments/rejected"),
   getPaymentsAccepted: () => request("/notifications/payments/accepted"),
   sendPaymentNotifications: (type, payments) =>

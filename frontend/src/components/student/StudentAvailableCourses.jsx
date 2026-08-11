@@ -68,6 +68,7 @@ const StudentAvailableCourses = () => {
   const [success, setSuccess] = useState('');
   const [schedulesPreview, setSchedulesPreview] = useState({});
   const [loadingSchedules, setLoadingSchedules] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -187,8 +188,10 @@ const StudentAvailableCourses = () => {
 
   const handleEnroll = async () => {
     if (selectedItems.length === 0) return setError('Selecciona al menos un curso');
+    if (submitting) return; // UX-01: evita doble envío con doble clic
 
     try {
+      setSubmitting(true);
       setError('');
       const items = selectedItems.map(item => ({ type: item.type, id: item.id }));
       await enrollmentsAPI.create(items);
@@ -198,6 +201,8 @@ const StudentAvailableCourses = () => {
       loadData();
     } catch (err) {
       setError(err.message || 'Error al procesar la matrícula');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -453,7 +458,7 @@ const StudentAvailableCourses = () => {
 
       {/* DIALOGO DE CONFIRMACIÓN (Manteniendo lógica original pero mejor estilo) */}
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle className="student-dialog-title">Resumen de Matrícula</DialogTitle>
+        <DialogTitle className="student-dialog-title">Confirmar Matrícula</DialogTitle>
         <DialogContent className="student-dialog-content">
           <Box mb={3}>
             {selectedItems.map(item => (
@@ -566,9 +571,9 @@ const StudentAvailableCourses = () => {
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2, borderTop: '1px solid #f1f5f9' }}>
-          <Button onClick={() => setOpenDialog(false)}>Cancelar</Button>
-          <Button onClick={handleEnroll} variant="contained" className="student-btn-primary">
-            Confirmar
+          <Button onClick={() => setOpenDialog(false)} disabled={submitting}>Cancelar</Button>
+          <Button onClick={handleEnroll} variant="contained" className="student-btn-primary" disabled={submitting}>
+            {submitting ? 'Enviando…' : 'Confirmar Matrícula'}
           </Button>
         </DialogActions>
       </Dialog>
