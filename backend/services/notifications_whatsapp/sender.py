@@ -3,7 +3,9 @@ WhatsApp message sender
 """
 import time
 import random
+import urllib.parse
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from .config import MESSAGE_DELAY_MIN, MESSAGE_DELAY_MAX, COUNTRY_CODE
@@ -17,8 +19,7 @@ def normalize_phone(phone):
     return clean
 
 def send_message(driver, phone, message):
-    """Send a single WhatsApp message"""
-    import urllib.parse
+    """Send a single WhatsApp message handling popups and JS click dispatch"""
     phone = normalize_phone(phone)
     
     # Encode message in URL
@@ -27,44 +28,67 @@ def send_message(driver, phone, message):
     
     try:
         driver.get(url)
-        time.sleep(8)
+        time.sleep(5)
         
-        # Find message input
-        wait = WebDriverWait(driver, 20)
+        # Check if invalid number dialog appears
+        try:
+            dialogs = driver.find_elements(By.CSS_SELECTOR, 'div[role="dialog"]')
+            for dialog in dialogs:
+                txt = dialog.text.lower()
+                if "no es válido" in txt or "invalid" in txt or "no se pudo encontrar" in txt:
+                    # Dismiss dialog
+                    try:
+                        ok_btn = dialog.find_element(By.CSS_SELECTOR, 'button')
+                        driver.execute_script("arguments[0].click();", ok_btn)
+                    except Exception:
+                        pass
+                    save_screenshot(driver, "errors", f"invalid_phone_{phone}")
+                    return {
+                        "phone": phone,
+                        "status": "error",
+                        "message": "El número de teléfono no es válido o no está registrado en WhatsApp"
+                    }
+        except Exception:
+            pass
+        
+        # Find message input box
+        wait = WebDriverWait(driver, 18)
         input_box = wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, 'div[contenteditable="true"][role="textbox"]'))
+            EC.presence_of_element_located((By.CSS_SELECTOR, 'div[contenteditable="true"][role="textbox"], div[data-testid="conversation-compose-box-input"]'))
         )
         
-        # Click input (message already loaded from URL)
-        input_box.click()
+        # Focus input box safely with JavaScript to avoid element click interception
+        driver.execute_script("arguments[0].focus();", input_box)
+        time.sleep(1)
+        
+        # Press ENTER to send
+        input_box.send_keys(Keys.ENTER)
         time.sleep(2)
         
-        # Try multiple selectors for send button
+        # Fallback: Find and click send button with JavaScript if still present
         send_selectors = [
             'button[aria-label="Enviar"]',
             'button[data-tab="11"]',
-            'span[data-icon="send"]'
+            'span[data-icon="send"]',
+            'button[data-testid="compose-btn-send"]'
         ]
         
-        send_button = None
         for selector in send_selectors:
             try:
-                send_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, selector)))
-                break
-            except:
+                btns = driver.find_elements(By.CSS_SELECTOR, selector)
+                if btns and btns[0].is_displayed():
+                    driver.execute_script("arguments[0].click();", btns[0])
+                    time.sleep(2)
+                    break
+            except Exception:
                 continue
         
-        if not send_button:
-            raise Exception("Send button not found")
-        
-        # Send
-        send_button.click()
-        time.sleep(5)
+        time.sleep(3)
         
         # Screenshot after sending
         save_screenshot(driver, "success", "message_sent")
         
-        return {"phone": phone, "status": "success", "message": "Sent"}
+        return {"phone": phone, "status": "success", "message": "Enviado correctamente"}
         
     except Exception as e:
         save_screenshot(driver, "errors", f"error_{phone}")
@@ -75,20 +99,20 @@ def send_messages(driver, messages):
     results = []
     
     for i, msg in enumerate(messages, 1):
-        print(f"\n[{i}/{len(messages)}] Sending to {msg['phone']}...")
+        print(f"\n[{i}/{len(messages)}] Enviando a {msg['phone']}...")
         
         result = send_message(driver, msg['phone'], msg['message'])
         results.append(result)
         
         if result['status'] == 'success':
-            print(f"✓ Sent successfully")
+            print(f"✓ Enviado exitosamente")
         else:
             print(f"✗ Error: {result['message']}")
         
         # Random delay between messages
         if i < len(messages):
             delay = random.randint(MESSAGE_DELAY_MIN, MESSAGE_DELAY_MAX)
-            print(f"⏱️  Waiting {delay}s...")
+            print(f"⏱️  Esperando {delay}s...")
             time.sleep(delay)
     
     return results

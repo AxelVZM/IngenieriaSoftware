@@ -1,22 +1,39 @@
 """
 WhatsApp notification controller
 """
+import logging
 from fastapi import HTTPException
+from selenium.common.exceptions import WebDriverException, InvalidSessionIdException
 from services.notifications_whatsapp.driver import setup_driver
 from services.notifications_whatsapp.session import wait_for_login, verify_login
 from services.notifications_whatsapp.sender import send_message
 
+logger = logging.getLogger(__name__)
+
 # Global driver instance
 _driver = None
+
+
+def safe_quit_driver():
+    """Safely terminate and reset the global driver instance without raising exceptions"""
+    global _driver
+    if _driver is not None:
+        try:
+            _driver.quit()
+        except Exception:
+            pass
+        finally:
+            _driver = None
+
 
 async def init_whatsapp_session():
     """Initialize WhatsApp session and return QR code"""
     global _driver
     
+    # Always cleanup existing or dead driver safely first
+    safe_quit_driver()
+    
     try:
-        if _driver:
-            _driver.quit()
-        
         _driver = setup_driver()
         qr_base64 = wait_for_login(_driver)
         
@@ -26,56 +43,72 @@ async def init_whatsapp_session():
         return {"status": "qr_ready", "qr": qr_base64}
         
     except Exception as e:
-        if _driver:
-            _driver.quit()
-            _driver = None
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Error initializing WhatsApp session")
+        safe_quit_driver()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error conectando con servicio de WhatsApp (Selenium/Docker): {str(e)}"
+        )
+
 
 async def verify_whatsapp_login():
     """Verify WhatsApp login status"""
     global _driver
     
     if not _driver:
-        raise HTTPException(status_code=400, detail="No active session")
+        return {"logged_in": False}
     
     try:
         is_logged = verify_login(_driver)
         return {"logged_in": is_logged}
+    except (InvalidSessionIdException, WebDriverException):
+        safe_quit_driver()
+        return {"logged_in": False}
     except Exception as e:
+        safe_quit_driver()
         raise HTTPException(status_code=500, detail=str(e))
+
 
 async def send_test_message(phone: str):
     """Send test message"""
     global _driver
     
     if not _driver:
-        raise HTTPException(status_code=400, detail="No active session")
+        raise HTTPException(
+            status_code=400,
+            detail="No hay una sesión activa de WhatsApp. Inicia sesión primero."
+        )
     
     try:
-        result = send_message(_driver, phone, "Mensaje de prueba desde Academia")
+        result = send_message(_driver, phone, "Mensaje de prueba desde Academia UNI")
         return result
+    except (InvalidSessionIdException, WebDriverException) as e:
+        safe_quit_driver()
+        raise HTTPException(
+            status_code=400,
+            detail="La sesión de WhatsApp expiró o se cerró. Inicia sesión nuevamente."
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 async def close_whatsapp_session():
     """Close WhatsApp session"""
-    global _driver
-    
-    if _driver:
-        _driver.quit()
-        _driver = None
-    
+    safe_quit_driver()
     return {"status": "closed"}
+
 
 async def send_whatsapp_message(phone: str, message: str):
     """Send WhatsApp message to a phone number"""
     global _driver
     
     if not _driver:
-        raise HTTPException(status_code=400, detail="No active WhatsApp session")
+        raise HTTPException(
+            status_code=400,
+            detail="No hay una sesión activa de WhatsApp. Inicia sesión primero."
+        )
     
     try:
-        # Validate phone number
         phone = phone.strip()
         if not phone or len(phone) != 9 or not phone.startswith('9'):
             return {
@@ -83,15 +116,21 @@ async def send_whatsapp_message(phone: str, message: str):
                 'message': 'Número de teléfono inválido'
             }
         
-        # Send message using sender module
         result = send_message(_driver, phone, message)
         return result
         
+    except (InvalidSessionIdException, WebDriverException) as e:
+        safe_quit_driver()
+        return {
+            'status': 'error',
+            'message': 'La sesión de WhatsApp expiró o se cerró. Vuelva a iniciar sesión.'
+        }
     except Exception as e:
         return {
             'status': 'error',
             'message': str(e)
         }
+
 
 async def get_rejected_payments(db):
     """Get list of rejected payments from last 30 days"""
@@ -120,6 +159,7 @@ async def get_rejected_payments(db):
     results = await db.fetch(query)
     return [dict(row) for row in results]
 
+
 async def get_accepted_payments(db):
     """Get list of accepted payments from last 7 days"""
     query = """
@@ -147,12 +187,16 @@ async def get_accepted_payments(db):
     results = await db.fetch(query)
     return [dict(row) for row in results]
 
+
 async def send_payment_notifications(notification_type: str, payments: list):
     """Send WhatsApp notifications for payments"""
     global _driver
     
     if not _driver:
-        raise HTTPException(status_code=400, detail="No active WhatsApp session")
+        raise HTTPException(
+            status_code=400,
+            detail="No hay una sesión activa de WhatsApp. Inicia sesión primero."
+        )
     
     results = []
     
@@ -207,6 +251,15 @@ El pago de S/ {payment['amount']:.2f} para el curso *{payment['course_name']}* d
             import time
             time.sleep(2)
             
+        except (InvalidSessionIdException, WebDriverException) as e:
+            safe_quit_driver()
+            results.append({
+                'phone': phone,
+                'student': payment['student_name'],
+                'status': 'error',
+                'message': 'La sesión de WhatsApp se cerró o expiró en el navegador.'
+            })
+            break
         except Exception as e:
             results.append({
                 'phone': phone,

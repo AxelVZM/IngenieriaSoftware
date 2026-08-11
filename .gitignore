@@ -26,3 +26,5 @@ backend/.venv/
 tareas/
 .agents/
 plan_pruebas_cursos_ciclos.md
+
+notificaciones/whatsapp_profile/*

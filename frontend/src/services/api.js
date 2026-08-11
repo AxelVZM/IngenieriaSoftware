@@ -1,5 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
-const TIEMPO_MAXIMO_MS = 20000;
+const TIEMPO_MAXIMO_MS = 60000;
 
 // Códigos que significan "la sesión ya no sirve" -> cerrar sesión local
 const SESSION_ERROR_CODES = [
@@ -249,8 +249,9 @@ async function request(endpoint, options = {}) {
     delete config.headers["Content-Type"];
   }
 
+  const timeoutMs = options.timeout || TIEMPO_MAXIMO_MS;
   const controlador = new AbortController();
-  const temporizador = setTimeout(() => controlador.abort(), TIEMPO_MAXIMO_MS);
+  const temporizador = setTimeout(() => controlador.abort(), timeoutMs);
   config.signal = controlador.signal;
 
   let response;
@@ -631,11 +632,11 @@ export const adminAPI = {
 // API de notificaciones
 export const notificationsAPI = {
   initWhatsApp: () =>
-    request("/notifications/whatsapp/init", { method: "POST" }),
+    request("/notifications/whatsapp/init", { method: "POST", timeout: 60000 }),
   verifyWhatsApp: () =>
-    request("/notifications/whatsapp/verify", { method: "POST" }),
+    request("/notifications/whatsapp/verify", { method: "POST", timeout: 30000 }),
   testWhatsApp: (phone = "969728039") =>
-    request(`/notifications/whatsapp/test?phone=${phone}`, { method: "POST" }),
+    request(`/notifications/whatsapp/test?phone=${phone}`, { method: "POST", timeout: 45000 }),
   closeWhatsApp: () =>
     request("/notifications/whatsapp/close", { method: "POST" }),
 
@@ -645,6 +646,7 @@ export const notificationsAPI = {
     request("/notifications/payments/send", {
       method: "POST",
       body: JSON.stringify({ type, payments }),
+      timeout: 120000,
     }),
 };
 

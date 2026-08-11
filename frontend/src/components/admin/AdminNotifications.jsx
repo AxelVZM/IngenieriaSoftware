@@ -286,7 +286,7 @@ export default function AdminNotifications() {
     const typeLabel = type === "rejected" ? "rechazados" : "aceptados";
     setConfirmModal({
       open: true,
-      title: "Confirmar Envío Masivo de Notificaciones",
+      title: "Confirmar Envío de Notificaciones",
       content: `¿Está seguro de enviar ${payments.length} notificaciones de pagos ${typeLabel} a WhatsApp? Este proceso automatizado enviará los mensajes a través de la sesión de WhatsApp Web.`,
       onConfirm: () => executeSendPaymentNotifications(type, payments),
     });
@@ -411,17 +411,23 @@ export default function AdminNotifications() {
     }
   };
 
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+    setMessage(null);
+    setFailedNotifications([]);
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
         📱 Notificaciones WhatsApp
       </Typography>
 
-      <Tabs value={tabValue} onChange={(e, v) => setTabValue(v)} sx={{ mb: 3 }}>
+      <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 3 }}>
         <Tab label="WhatsApp Login" />
         <Tab label="Pagos Rechazados" />
         <Tab label="Pagos Aceptados" />
-        <Tab label="Asistencias" />
+        {/* <Tab label="Asistencias" /> */}
       </Tabs>
 
       <TabPanel value={tabValue} index={0}>
@@ -433,7 +439,7 @@ export default function AdminNotifications() {
 
             {/* Advertencia */}
             <Alert severity="warning" sx={{ mb: 3 }}>
-              <strong>⚠️ IMPORTANTE:</strong>
+              <strong>IMPORTANTE:</strong>
               <ul style={{ margin: "8px 0", paddingLeft: "20px" }}>
                 <li>Cierra WhatsApp Web en otros dispositivos</li>
                 <li>Escanea el QR con tu teléfono</li>

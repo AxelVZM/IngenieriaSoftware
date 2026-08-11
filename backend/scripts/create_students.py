@@ -56,7 +56,7 @@ async def main():
                 continue
             
             # Password hasheado (default: 123456)
-            password = "123456"
+            password = "A123456"
             password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
             
             student = await conn.fetchrow(
@@ -70,7 +70,7 @@ async def main():
             print(f"  ✓ {student['first_name']} {student['last_name']} - DNI: {student['dni']} - Pass: {password}")
         
         print(f"\n✅ {created} estudiantes creados exitosamente!")
-        print(f"\n📝 Contraseñas: 123456 para todos")
+        print(f"\n📝 Contraseñas: A123456 para todos")
         
     except Exception as e:
         print(f"\n❌ Error: {e}")
