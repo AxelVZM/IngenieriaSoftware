@@ -23,6 +23,7 @@ import {
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
+  Edit as EditIcon,
   RestartAlt as RestartAltIcon,
   Search as SearchIcon
 } from '@mui/icons-material';
@@ -30,12 +31,16 @@ import { teachersAPI } from '../../services/api';
 import './admin-dashboard.css';
 import { useDialog } from '../../hooks/useDialog';
 import DialogWrapper from '../common/DialogWrapper';
+import UsersSectionNav from './UsersSectionNav';
+
+const emptyForm = { first_name: '', last_name: '', dni: '', phone: '', email: '', specialization: '' };
 
 const AdminTeachers = () => {
   const [teachers, setTeachers] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
-  const [form, setForm] = useState({ first_name: '', last_name: '', dni: '', phone: '', email: '', specialization: '' });
+  const [form, setForm] = useState(emptyForm);
   const [searchQuery, setSearchQuery] = useState('');
+  const [editingId, setEditingId] = useState(null); // null = creando, id = editando
 
   const { confirmDialog, alertDialog, showConfirm, showAlert, closeConfirm, closeAlert } = useDialog();
 
@@ -48,14 +53,43 @@ const AdminTeachers = () => {
     }
   };
 
-  const handleCreate = async () => {
+  const handleOpenCreate = () => {
+    setEditingId(null);
+    setForm(emptyForm);
+    setOpenDialog(true);
+  };
+
+  const handleOpenEdit = (teacher) => {
+    setEditingId(teacher.id);
+    setForm({
+      first_name: teacher.first_name || '',
+      last_name: teacher.last_name || '',
+      dni: teacher.dni || '',
+      phone: teacher.phone || '',
+      email: teacher.email || '',
+      specialization: teacher.specialization || ''
+    });
+    setOpenDialog(true);
+  };
+
+  const handleSave = async () => {
     try {
-      await teachersAPI.create(form);
+      if (editingId) {
+        // No se reenvía el DNI en la edición: el DNI es el identificador
+        // original del docente y no debería cambiar desde este formulario.
+        const { dni, ...updateData } = form;
+        await teachersAPI.update(editingId, updateData);
+        showAlert('Docente actualizado exitosamente', 'success');
+      } else {
+        await teachersAPI.create(form);
+        showAlert('Docente creado exitosamente', 'success');
+      }
       setOpenDialog(false);
-      setForm({ first_name: '', last_name: '', dni: '', phone: '', email: '', specialization: '' });
+      setForm(emptyForm);
+      setEditingId(null);
       await fetchTeachers();
     } catch (err) {
-      showAlert(err.message || 'Error al crear docente', 'error');
+      showAlert(err.message || (editingId ? 'Error al actualizar docente' : 'Error al crear docente'), 'error');
     }
   };
 
@@ -107,12 +141,14 @@ const AdminTeachers = () => {
 
   return (
     <Box className="admin-dashboard">
+      <UsersSectionNav />
+
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" className="admin-dashboard-title">Gestión de Docentes</Typography>
         <Button
           variant="contained"
           startIcon={<AddIcon />}
-          onClick={() => setOpenDialog(true)}
+          onClick={handleOpenCreate}
           className="admin-button admin-button-primary"
         >
           Nuevo Docente
@@ -161,6 +197,11 @@ const AdminTeachers = () => {
                 <TableCell className="admin-table-cell">{t.email}</TableCell>
                 <TableCell className="admin-table-cell">{t.specialization || '-'}</TableCell>
                 <TableCell className="admin-table-cell">
+                  <Tooltip title="Editar docente">
+                    <IconButton size="small" onClick={() => handleOpenEdit(t)} className="admin-icon-button">
+                      <EditIcon />
+                    </IconButton>
+                  </Tooltip>
                   <Tooltip title="Reiniciar contraseña a DNI">
                     <IconButton size="small" onClick={() => handleResetPassword(t.id)} className="admin-icon-button">
                       <RestartAltIcon />
@@ -186,7 +227,7 @@ const AdminTeachers = () => {
       </TableContainer>
 
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth className="admin-dialog">
-        <DialogTitle>Nuevo Docente</DialogTitle>
+        <DialogTitle>{editingId ? 'Editar Docente' : 'Nuevo Docente'}</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, pt: 2 }}>
             <TextField
@@ -210,8 +251,10 @@ const AdminTeachers = () => {
               value={form.dni}
               onChange={(e) => setForm({ ...form, dni: e.target.value })}
               fullWidth
+              disabled={!!editingId}
               className="admin-input"
               placeholder="Ej: 12345678"
+              helperText={editingId ? 'El DNI no se puede modificar' : ''}
             />
             <TextField
               label="Teléfono"
@@ -245,8 +288,8 @@ const AdminTeachers = () => {
           <Button onClick={() => setOpenDialog(false)} className="admin-button admin-button-secondary">
             Cancelar
           </Button>
-          <Button variant="contained" onClick={handleCreate} className="admin-button admin-button-primary">
-            Crear Docente
+          <Button variant="contained" onClick={handleSave} className="admin-button admin-button-primary">
+            {editingId ? 'Guardar Cambios' : 'Crear Docente'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -20,7 +20,11 @@ async def get_teacher(teacher_id: int, db: asyncpg.Connection = Depends(get_db))
 
 @router.post("", dependencies=[Depends(require_role(["admin"]))], status_code=status.HTTP_201_CREATED)
 async def create_teacher(teacher: TeacherCreate, db: asyncpg.Connection = Depends(get_db)):
-    return await teacherController.create_teacher(teacher, db)
+    # Fix BG-U1
+    result = await teacherController.create_teacher(teacher, db)
+    if result and "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
 
 @router.put("/{teacher_id}", dependencies=[Depends(require_role(["admin"]))])
 async def update_teacher(teacher_id: int, teacher: TeacherUpdate, db: asyncpg.Connection = Depends(get_db)):
@@ -28,7 +32,14 @@ async def update_teacher(teacher_id: int, teacher: TeacherUpdate, db: asyncpg.Co
 
 @router.delete("/{teacher_id}", dependencies=[Depends(require_role(["admin"]))])
 async def delete_teacher(teacher_id: int, db: asyncpg.Connection = Depends(get_db)):
-    return await teacherController.delete_teacher(teacher_id, db)
+    # Fix FUN-01: delete_teacher() ahora puede devolver {"error": "..."} si
+    # el docente tiene ofertas asignadas, o si no existe.
+    result = await teacherController.delete_teacher(teacher_id, db)
+    if "error" in result:
+        if "no encontrado" in result["error"].lower():
+            raise HTTPException(status_code=404, detail=result["error"])
+        raise HTTPException(status_code=409, detail=result["error"])
+    return result
 
 @router.post("/{teacher_id}/reset-password", dependencies=[Depends(require_role(["admin"]))])
 async def reset_password(teacher_id: int, db: asyncpg.Connection = Depends(get_db)):

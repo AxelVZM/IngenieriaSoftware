@@ -14,37 +14,71 @@ import {
   MenuItem,
   Button,
   Divider,
+  IconButton,
+  Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   InputAdornment,
+  CircularProgress,
 } from "@mui/material";
-import { Search as SearchIcon } from "@mui/icons-material";
+import {
+  Search as SearchIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+} from "@mui/icons-material";
 import {
   coursesAPI,
   packagesAPI,
   enrollmentsAPI,
   studentsAPI,
 } from "../../services/api";
+import UsersSectionNav from "./UsersSectionNav";
 import "./admin-dashboard.css";
+import { useDialog } from "../../hooks/useDialog";
+import DialogWrapper from "../common/DialogWrapper";
+
+const emptyForm = {
+  first_name: "",
+  last_name: "",
+  dni: "",
+  phone: "",
+  parent_name: "",
+  parent_phone: "",
+};
 
 const AdminStudents = () => {
   const [students, setStudents] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [loading, setLoading] = useState(true); // Fix UX-01
+
   const [filterType, setFilterType] = useState("course");
   const [courseOfferings, setCourseOfferings] = useState([]);
   const [packageOfferings, setPackageOfferings] = useState([]);
   const [selectedOfferingId, setSelectedOfferingId] = useState("");
-  const [filteredStudents, setFilteredStudents] = useState([]);
+  const [filteredStudents, setFilteredStudents] = useState(null);
+
+  const [openDialog, setOpenDialog] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const [editingId, setEditingId] = useState(null);
+
+  const { confirmDialog, alertDialog, showConfirm, showAlert, closeConfirm, closeAlert } = useDialog();
 
   const fetchStudents = async () => {
+    setLoading(true);
     try {
       const data = await studentsAPI.getAll();
       setStudents(data);
     } catch (err) {
       console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
   const fetchOfferingsData = async () => {
     try {
-      // Curso: obtener todas las ofertas desde coursesAPI.getAll
       const courses = await coursesAPI.getAll();
       const co = [];
       (courses || []).forEach((c) => {
@@ -59,7 +93,6 @@ const AdminStudents = () => {
       });
       setCourseOfferings(co);
 
-      // Paquete: obtener ofertas
       const poRaw = await packagesAPI.getOfferings();
       const po = (poRaw || []).map((o) => ({
         id: o.id,
@@ -75,7 +108,7 @@ const AdminStudents = () => {
 
   const applyFilter = async () => {
     try {
-      if (!selectedOfferingId) return setFilteredStudents([]);
+      if (!selectedOfferingId) return setFilteredStudents(null);
       const data = await enrollmentsAPI.getByOffering(
         filterType,
         selectedOfferingId,
@@ -88,37 +121,95 @@ const AdminStudents = () => {
     }
   };
 
+  const clearFilter = () => {
+    setSelectedOfferingId("");
+    setFilteredStudents(null);
+  };
+
   useEffect(() => {
     fetchStudents();
     fetchOfferingsData();
   }, []);
 
+  const handleOpenEdit = (student) => {
+    setEditingId(student.id);
+    setForm({
+      first_name: student.first_name || "",
+      last_name: student.last_name || "",
+      dni: student.dni || "",
+      phone: student.phone || "",
+      parent_name: student.parent_name || "",
+      parent_phone: student.parent_phone || "",
+    });
+    setOpenDialog(true);
+  };
+
+  const handleSave = async () => {
+    try {
+      const { dni, ...updateData } = form;
+      await studentsAPI.update(editingId, updateData);
+      showAlert("Estudiante actualizado exitosamente", "success");
+      setOpenDialog(false);
+      setForm(emptyForm);
+      setEditingId(null);
+      await fetchStudents();
+    } catch (err) {
+      showAlert(err.message || "Error al actualizar estudiante", "error");
+    }
+  };
+
+  const handleDelete = async (id) => {
+    const confirmed = await showConfirm({
+      title: "¿Eliminar estudiante?",
+      message: "Esta acción eliminará permanentemente al estudiante del sistema.",
+      type: "error",
+      confirmText: "Eliminar",
+    });
+    if (!confirmed) return;
+
+    try {
+      await studentsAPI.delete(id);
+      showAlert("Estudiante eliminado exitosamente", "success");
+      await fetchStudents();
+    } catch (err) {
+      showAlert(err.message || "Error al eliminar estudiante", "error");
+    }
+  };
+
+  const getFilteredBySearch = () => {
+    if (!searchQuery) return students;
+    return students.filter(
+      (s) =>
+        s.dni?.includes(searchQuery) ||
+        s.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.last_name?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  };
+
+  const rowsToShow = filteredStudents !== null ? filteredStudents : getFilteredBySearch();
+
   return (
     <Box className="admin-dashboard">
-      <Typography variant="h4" gutterBottom className="admin-dashboard-title">
-        Estudiantes Matriculados
-      </Typography>
+      <UsersSectionNav />
+
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h4" className="admin-dashboard-title">
+          Estudiantes Matriculados
+        </Typography>
+      </Box>
 
       <Paper sx={{ p: 3, mb: 3 }} className="admin-filters">
         <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
-          Filtrar estudiantes por oferta
+          Filtrar estudiantes por oferta (opcional)
         </Typography>
-        <Box
-          sx={{
-            display: "flex",
-            gap: 2,
-            alignItems: "center",
-            flexWrap: "wrap",
-          }}
-        >
+        <Box sx={{ display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap" }}>
           <TextField
             select
             label="Tipo"
             value={filterType}
             onChange={(e) => {
               setFilterType(e.target.value);
-              setSelectedOfferingId("");
-              setFilteredStudents([]);
+              clearFilter();
             }}
             size="small"
             className="admin-input admin-select"
@@ -128,74 +219,174 @@ const AdminStudents = () => {
           </TextField>
           <TextField
             select
-            label={
-              filterType === "course" ? "Oferta de curso" : "Oferta de paquete"
-            }
+            label={filterType === "course" ? "Oferta de curso" : "Oferta de paquete"}
             value={selectedOfferingId}
             onChange={(e) => setSelectedOfferingId(e.target.value)}
             size="small"
             sx={{ minWidth: 320 }}
             className="admin-input admin-select"
           >
-            {(filterType === "course" ? courseOfferings : packageOfferings).map(
-              (o) => (
-                <MenuItem key={o.id} value={o.id}>
-                  {o.label}
-                </MenuItem>
-              )
-            )}
+            {(filterType === "course" ? courseOfferings : packageOfferings).map((o) => (
+              <MenuItem key={o.id} value={o.id}>
+                {o.label}
+              </MenuItem>
+            ))}
           </TextField>
-          <Button
-            variant="contained"
-            onClick={applyFilter}
-            className="admin-button admin-button-primary"
-          >
+          <Button variant="contained" onClick={applyFilter} className="admin-button admin-button-primary">
             Aplicar Filtro
           </Button>
+          {filteredStudents !== null && (
+            <Button variant="outlined" onClick={clearFilter} className="admin-button admin-button-secondary">
+              Quitar Filtro
+            </Button>
+          )}
         </Box>
+      </Paper>
 
-        <Divider sx={{ my: 3 }} />
-        <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
-          Resultados del Filtro
-        </Typography>
-        <TableContainer
-          component={Paper}
-          variant="outlined"
-          className="admin-table-container"
-        >
+      <Box mb={3} className="admin-filters">
+        <TextField
+          fullWidth
+          placeholder="Buscar por DNI o nombre..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          disabled={filteredStudents !== null}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon color="action" />
+              </InputAdornment>
+            ),
+          }}
+          className="admin-input"
+          size="small"
+        />
+      </Box>
+
+      <Divider sx={{ mb: 3 }} />
+      <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
+        {filteredStudents !== null ? "Resultados del Filtro" : `Todos los Estudiantes (${rowsToShow.length})`}
+      </Typography>
+
+      {loading ? (
+        <Box display="flex" justifyContent="center" alignItems="center" py={6}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <TableContainer component={Paper} variant="outlined" className="admin-table-container">
           <Table className="admin-table">
             <TableHead className="admin-table-head">
               <TableRow>
                 <TableCell className="admin-table-head-cell">DNI</TableCell>
-                <TableCell className="admin-table-head-cell">
-                  Nombre Completo
-                </TableCell>
+                <TableCell className="admin-table-head-cell">Nombre Completo</TableCell>
+                <TableCell className="admin-table-head-cell">Teléfono</TableCell>
+                {filteredStudents === null && (
+                  <TableCell className="admin-table-head-cell">Acciones</TableCell>
+                )}
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredStudents.map((s) => (
-                <TableRow key={s.enrollment_id} className="admin-table-row">
+              {rowsToShow.map((s) => (
+                <TableRow key={s.enrollment_id || s.id} className="admin-table-row">
                   <TableCell className="admin-table-cell">{s.dni}</TableCell>
                   <TableCell className="admin-table-cell">
                     <Typography variant="subtitle2" fontWeight="bold">
                       {s.first_name} {s.last_name}
                     </Typography>
                   </TableCell>
+                  <TableCell className="admin-table-cell">{s.phone}</TableCell>
+                  {filteredStudents === null && (
+                    <TableCell className="admin-table-cell">
+                      <Tooltip title="Editar estudiante">
+                        <IconButton size="small" onClick={() => handleOpenEdit(s)} className="admin-icon-button">
+                          <EditIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <IconButton size="small" color="error" onClick={() => handleDelete(s.id)} className="admin-icon-button">
+                        <DeleteIcon />
+                      </IconButton>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
-              {filteredStudents.length === 0 && (
+              {rowsToShow.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={2} align="center" sx={{ py: 3 }}>
-                    <Typography color="text.secondary">
-                      Sin resultados
-                    </Typography>
+                  <TableCell colSpan={filteredStudents === null ? 4 : 2} align="center" sx={{ py: 3 }}>
+                    <Typography color="text.secondary">Sin resultados</Typography>
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </TableContainer>
-      </Paper>
+      )}
+
+      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth className="admin-dialog">
+        <DialogTitle>Editar Estudiante</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 3, pt: 2 }}>
+            <TextField
+              label="Nombres"
+              value={form.first_name}
+              onChange={(e) => setForm({ ...form, first_name: e.target.value })}
+              fullWidth
+              className="admin-input"
+            />
+            <TextField
+              label="Apellidos"
+              value={form.last_name}
+              onChange={(e) => setForm({ ...form, last_name: e.target.value })}
+              fullWidth
+              className="admin-input"
+            />
+            <TextField
+              label="DNI"
+              value={form.dni}
+              fullWidth
+              disabled
+              className="admin-input"
+              helperText="El DNI no se puede modificar"
+            />
+            <TextField
+              label="Teléfono"
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              fullWidth
+              className="admin-input"
+            />
+            <TextField
+              label="Nombre del Apoderado"
+              value={form.parent_name}
+              onChange={(e) => setForm({ ...form, parent_name: e.target.value })}
+              fullWidth
+              className="admin-input"
+              sx={{ gridColumn: "1 / -1" }}
+            />
+            <TextField
+              label="Teléfono del Apoderado"
+              value={form.parent_phone}
+              onChange={(e) => setForm({ ...form, parent_phone: e.target.value })}
+              fullWidth
+              className="admin-input"
+              sx={{ gridColumn: "1 / -1" }}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenDialog(false)} className="admin-button admin-button-secondary">
+            Cancelar
+          </Button>
+          <Button variant="contained" onClick={handleSave} className="admin-button admin-button-primary">
+            Guardar Cambios
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <DialogWrapper
+        confirmDialog={confirmDialog}
+        alertDialog={alertDialog}
+        closeConfirm={closeConfirm}
+        closeAlert={closeAlert}
+      />
     </Box>
   );
 };

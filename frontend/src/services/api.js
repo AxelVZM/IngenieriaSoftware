@@ -242,6 +242,16 @@ export const studentsAPI = {
       body: JSON.stringify(data),
     }),
   getAll: () => request("/students"),
+  getOne: (id) => request(`/students/${id}`),
+  update: (id, data) =>
+    request(`/students/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  delete: (id) =>
+    request(`/students/${id}`, {
+      method: "DELETE",
+    }),
 };
 
 // API de ciclos
