@@ -30,12 +30,22 @@ function clearSession() {
 
 // Pydantic emite sus mensajes propios en inglés; se traducen los que pueden
 // aparecer en los formularios. Los de nuestros validadores ya vienen en español.
+// La traducción puede ser una función cuando necesita un dato del mensaje
+// original, como la cantidad mínima de caracteres.
 const MENSAJES_PYDANTIC = [
   [/^Field required$/i, 'Campo obligatorio'],
   [/^Input should be a valid number/i, 'Debe ser un número válido'],
   [/^Input should be a valid integer/i, 'Debe ser un número entero válido'],
   [/^Input should be a valid date/i, 'Debe ser una fecha válida (AAAA-MM-DD)'],
   [/^Input should be a valid string/i, 'Debe ser un texto válido'],
+  [/^Input should be a valid boolean/i, 'Debe ser verdadero o falso'],
+  [/^Input should be a valid list/i, 'Debe ser una lista'],
+  [/^String should have at least (\d+) characters?$/i,
+    (m) => `Debe tener al menos ${m[1]} caracteres`],
+  [/^String should have at most (\d+) characters?$/i,
+    (m) => `Debe tener como máximo ${m[1]} caracteres`],
+  [/^List should have at least (\d+) items?/i,
+    (m) => `Debe tener al menos ${m[1]} elemento(s)`],
 ];
 
 // Nombres de campo legibles; si un campo no está aquí se muestra tal cual.
@@ -60,6 +70,32 @@ const ETIQUETAS_CAMPO = {
   start_time: 'Hora de inicio',
   end_time: 'Hora de fin',
   classroom: 'Aula',
+  // Campos de los demás módulos. Sin ellos el usuario vería el nombre de la
+  // variable, porque el backend identifica los campos así en TODOS los 422.
+  dni: 'DNI',
+  email: 'Correo electrónico',
+  password: 'Contraseña',
+  username: 'Usuario',
+  role: 'Rol',
+  first_name: 'Nombres',
+  last_name: 'Apellidos',
+  phone: 'Teléfono',
+  parent_name: 'Nombre del apoderado',
+  parent_phone: 'Teléfono del apoderado',
+  student_id: 'Estudiante',
+  schedule_id: 'Horario',
+  date: 'Fecha',
+  enrollment_id: 'Matrícula',
+  installment_id: 'Cuota',
+  package_id: 'Paquete',
+  total_amount: 'Monto total',
+  paid_amount: 'Monto pagado',
+  num_installments: 'Número de cuotas',
+  first_due_date: 'Primer vencimiento',
+  related_id: 'Registro asociado',
+  course_ids: 'Cursos',
+  course_offering_ids: 'Ofertas',
+  items: 'Cursos a matricular',
 };
 
 /** Etiqueta legible de un campo; acepta rutas anidadas como "body.base_price". */
@@ -68,16 +104,37 @@ function etiquetaDeCampo(campo) {
   return ETIQUETAS_CAMPO[hoja] ?? hoja ?? '';
 }
 
+/** Minúsculas y sin tildes, para comparar textos sin depender del acento. */
+function normalizar(texto) {
+  return String(texto).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
 /**
- * Traduce un mensaje de Pydantic. Devuelve además si era genérico: los
- * mensajes genéricos ("Campo obligatorio") necesitan que se les anteponga el
- * campo, mientras que los de nuestros validadores ya lo nombran por sí solos.
+ * Antepone al mensaje la etiqueta del campo, salvo cuando el propio mensaje ya
+ * lo nombra: nuestros validadores escriben frases completas ("El precio base
+ * debe ser mayor que 0") y anteponerles la etiqueta las dejaría repetidas.
+ *
+ * La decisión se toma mirando el texto, NO si el mensaje venía traducido. Con
+ * el criterio anterior los validadores de otros módulos —que redactan mensajes
+ * sin nombrar el campo, como "Solo puede contener letras…"— se quedaban sin
+ * prefijo y no había forma de saber a qué campo se referían.
  */
+function conEtiqueta(campo, texto) {
+  const etiqueta = etiquetaDeCampo(campo);
+  if (!etiqueta) return texto;
+  if (normalizar(texto).includes(normalizar(etiqueta))) return texto;
+  return `${etiqueta}: ${texto}`;
+}
+
+/** Traduce un mensaje de Pydantic; si no lo reconoce lo devuelve tal cual. */
 function traducirMensaje(msg) {
   for (const [patron, traduccion] of MENSAJES_PYDANTIC) {
-    if (patron.test(msg)) return { texto: traduccion, generico: true };
+    const coincidencia = patron.exec(msg);
+    if (coincidencia) {
+      return typeof traduccion === 'function' ? traduccion(coincidencia) : traduccion;
+    }
   }
-  return { texto: msg, generico: false };
+  return msg;
 }
 
 /**
@@ -105,14 +162,12 @@ function extractErrorMessage(data, response) {
 
         const crudo = String(item?.msg ?? '').replace(/^Value error,\s*/i, '');
         if (!crudo) return '';
-        const { texto, generico } = traducirMensaje(crudo);
 
         const campo = Array.isArray(item?.loc)
           ? item.loc.filter((p) => p !== 'body' && typeof p === 'string').pop()
           : null;
 
-        if (!campo || !generico) return texto;
-        return `${etiquetaDeCampo(campo)}: ${texto}`;
+        return conEtiqueta(campo, traducirMensaje(crudo));
       })
       .filter(Boolean);
 
@@ -133,8 +188,7 @@ function extractErrorMessage(data, response) {
  * El backend nombra los campos con su identificador interno (`base_price`,
  * `duration_months`, `day_of_week`). Mostrárselos al usuario es un defecto de
  * usabilidad: aquí se cambian por la etiqueta del formulario y se traducen los
- * mensajes que Pydantic emite en inglés. Los mensajes de nuestros propios
- * validadores ya nombran el campo en español, así que no se les antepone nada.
+ * mensajes que Pydantic emite en inglés.
  */
 function formatearErroresDeValidacion(errores) {
   if (!Array.isArray(errores) || !errores.length) return null;
@@ -143,11 +197,7 @@ function formatearErroresDeValidacion(errores) {
     .map((item) => {
       const crudo = String(item?.message ?? '').replace(/^Value error,\s*/i, '');
       if (!crudo) return '';
-      const { texto, generico } = traducirMensaje(crudo);
-      const etiqueta = etiquetaDeCampo(item?.field);
-
-      if (!etiqueta || !generico) return texto;
-      return `${etiqueta}: ${texto}`;
+      return conEtiqueta(item?.field, traducirMensaje(crudo));
     })
     .filter(Boolean);
 

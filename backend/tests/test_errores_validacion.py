@@ -15,6 +15,8 @@ exactamente el defecto que estas pruebas impiden reintroducir.
 """
 
 import json
+import pathlib
+import re
 
 import pytest
 from fastapi.exceptions import RequestValidationError
@@ -119,39 +121,48 @@ async def test_se_retira_el_prefijo_de_pydantic_de_los_mensajes_propios():
 # Cobertura de los formularios del módulo
 # ---------------------------------------------------------------------------
 
-# Todo campo que un formulario de cursos, ciclos, ofertas u horarios pueda
-# hacer fallar tiene que llegar identificado, para que el frontend lo pueda
-# traducir. La lista de etiquetas vive en frontend/src/services/api.js.
-CAMPOS_DE_LOS_FORMULARIOS = {
-    "name", "description", "base_price",
-    "start_date", "end_date", "duration_months", "status",
-    "course_id", "cycle_id", "group_label", "teacher_id",
-    "price_override", "capacity",
-    "course_offering_id", "day_of_week", "start_time", "end_time", "classroom",
-}
+API_JS = (
+    pathlib.Path(__file__).resolve().parents[2]
+    / "frontend" / "src" / "services" / "api.js"
+)
+
+
+def _etiquetas_del_frontend():
+    """
+    Lee las claves de ETIQUETAS_CAMPO directamente de api.js.
+
+    Se lee el archivo en vez de copiar la lista aquí porque una copia se
+    desincroniza en silencio: quien agregue un campo tocaría el modelo y el
+    formulario, no esta prueba, y el defecto volvería sin que nada avise.
+    """
+    fuente = API_JS.read_text(encoding="utf-8")
+    bloque = re.search(r"const ETIQUETAS_CAMPO = \{(.*?)\n\};", fuente, re.S)
+    assert bloque, f"no se encontró ETIQUETAS_CAMPO en {API_JS}"
+    return set(re.findall(r"^\s*(\w+):", bloque.group(1), re.M))
 
 
 @pytest.mark.parametrize(
-    "modelo, datos",
-    [
-        (CycleCreate, {}),
-        (CourseCreate, {}),
-        (CourseOfferingCreate, {}),
-        (ScheduleCreate, {}),
-    ],
+    "modelo",
+    [CycleCreate, CourseCreate, CourseOfferingCreate, ScheduleCreate],
     ids=["ciclo", "curso", "oferta", "horario"],
 )
-async def test_los_campos_reportados_son_los_que_el_frontend_sabe_traducir(modelo, datos):
-    detalle = await _detalle(modelo, **datos)
+async def test_los_campos_reportados_son_los_que_el_frontend_sabe_traducir(modelo):
+    """
+    Todo campo que un formulario del módulo pueda hacer fallar tiene que tener
+    etiqueta en el frontend. Si falta, al usuario le aparece el nombre de la
+    variable, que es el defecto que originó estas pruebas.
+    """
+    detalle = await _detalle(modelo)
+    etiquetas = _etiquetas_del_frontend()
 
     desconocidos = {
         e["field"] for e in detalle["errors"]
-        if e["field"] and e["field"] not in CAMPOS_DE_LOS_FORMULARIOS
+        if e["field"] and e["field"] not in etiquetas
     }
     assert not desconocidos, (
         f"{sorted(desconocidos)} no tienen etiqueta en ETIQUETAS_CAMPO "
-        f"(frontend/src/services/api.js): al usuario le aparecería el nombre "
-        f"de la variable en vez del nombre del campo."
+        f"({API_JS}): al usuario le aparecería el nombre de la variable en "
+        f"vez del nombre del campo."
     )
 
 
