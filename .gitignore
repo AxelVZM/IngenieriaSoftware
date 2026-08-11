@@ -19,6 +19,10 @@ Paginas de Prueba/
 .DS_Store
 Thumbs.db
 
-tareas/
+# Virtual Environment
+.venv/
+backend/.venv/
 
+tareas/
 .agents/
+plan_pruebas_cursos_ciclos.md

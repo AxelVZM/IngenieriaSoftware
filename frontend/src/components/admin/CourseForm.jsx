@@ -19,6 +19,8 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import { useFormik } from "formik";
 import * as yup from "yup";
 import { teachersAPI, coursesAPI, schedulesAPI } from "../../services/api";
+import { useDialog } from "../../hooks/useDialog";
+import DialogWrapper from "../common/DialogWrapper";
 
 const validationSchema = yup.object({
   name: yup.string().required("El nombre del curso es requerido"),
@@ -44,6 +46,7 @@ const CourseForm = () => {
   const [teachers, setTeachers] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [error, setError] = useState("");
+  const { confirmDialog, alertDialog, showConfirm, showAlert, closeConfirm, closeAlert } = useDialog();
 
   useEffect(() => {
     const fetchTeachers = async () => {
@@ -81,12 +84,13 @@ const CourseForm = () => {
         );
 
         await Promise.all(schedulePromises);
-        alert("Curso y horarios creados exitosamente");
+        showAlert("Curso y horarios creados exitosamente", "success");
         formik.resetForm();
         setSchedules([]);
       } catch (err) {
         console.error("Error:", err);
         setError("Error al crear el curso");
+        showAlert("Error al crear el curso", "error");
       }
     },
   });
@@ -308,6 +312,12 @@ const CourseForm = () => {
           </Grid>
         </form>
       </Paper>
+      <DialogWrapper
+        confirmDialog={confirmDialog}
+        alertDialog={alertDialog}
+        closeConfirm={closeConfirm}
+        closeAlert={closeAlert}
+      />
     </Box>
   );
 };

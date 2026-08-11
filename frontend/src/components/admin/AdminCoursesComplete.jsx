@@ -33,6 +33,7 @@ import { coursesAPI, cyclesAPI, teachersAPI } from '../../services/api';
 import './admin-dashboard.css';
 import { useDialog } from '../../hooks/useDialog';
 import DialogWrapper from '../common/DialogWrapper';
+import { formatCurrency } from '../../utils/formatters';
 
 const AdminCoursesComplete = () => {
   const [courses, setCourses] = useState([]);
@@ -107,6 +108,12 @@ const AdminCoursesComplete = () => {
               ...offering,
               course_name: course.name,
               base_price: course.base_price,
+              // Precio que realmente se aplica: la oferta puede sobreescribir
+              // el precio del curso con price_override. Antes la tabla mostraba
+              // siempre el base_price del curso, o sea un precio que no era el
+              // vigente para esa oferta.
+              effective_price: offering.price_override ?? course.base_price,
+              has_override: offering.price_override != null,
             });
           }
         }
@@ -283,7 +290,7 @@ const AdminCoursesComplete = () => {
                     <Typography variant="subtitle2" fontWeight="bold">{course.name}</Typography>
                   </TableCell>
                   <TableCell className="admin-table-cell">{course.description || '-'}</TableCell>
-                  <TableCell className="admin-table-cell">S/. {parseFloat(course.base_price || 0).toFixed(2)}</TableCell>
+                  <TableCell className="admin-table-cell">{formatCurrency(course.base_price)}</TableCell>
                   <TableCell className="admin-table-cell">
                     <IconButton
                       size="small"
@@ -348,7 +355,12 @@ const AdminCoursesComplete = () => {
                         : '-'}
                     </TableCell>
                     <TableCell className="admin-table-cell">
-                      S/. {parseFloat(offering.base_price || 0).toFixed(2)}
+                      {formatCurrency(offering.effective_price)}
+                      {offering.has_override && (
+                        <Typography variant="caption" display="block" color="text.secondary">
+                          precio propio · curso: {formatCurrency(offering.base_price)}
+                        </Typography>
+                      )}
                     </TableCell>
                     <TableCell className="admin-table-cell">{offering.capacity || '-'}</TableCell>
                     <TableCell className="admin-table-cell">

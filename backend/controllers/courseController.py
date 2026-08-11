@@ -1,40 +1,41 @@
 import asyncpg
+from fastapi import HTTPException
 from models.course import CourseCreate, CourseUpdate, CourseOfferingCreate, CourseOfferingUpdate
 
 async def get_all_courses(db: asyncpg.Connection):
+    # BG-C6: en vez de N+1 consultas (1 + por curso + por oferta), se hacen 3
+    # consultas y se agrupan en memoria. Evita la latencia acumulada contra la BD.
     courses = await db.fetch("SELECT * FROM courses ORDER BY name")
+
+    offerings = await db.fetch(
+        """SELECT co.*, cyc.name as cycle_name,
+                  t.first_name, t.last_name
+           FROM course_offerings co
+           LEFT JOIN cycles cyc ON co.cycle_id = cyc.id
+           LEFT JOIN teachers t ON co.teacher_id = t.id
+           ORDER BY cyc.start_date DESC, co.group_label"""
+    )
+
+    schedules = await db.fetch("SELECT * FROM schedules")
+
+    # Agrupar horarios por oferta
+    schedules_by_offering = {}
+    for s in schedules:
+        schedules_by_offering.setdefault(s['course_offering_id'], []).append(dict(s))
+
+    # Agrupar ofertas por curso, anidando sus horarios
+    offerings_by_course = {}
+    for offering in offerings:
+        offering_dict = dict(offering)
+        offering_dict['schedules'] = schedules_by_offering.get(offering['id'], [])
+        offerings_by_course.setdefault(offering['course_id'], []).append(offering_dict)
+
     courses_list = []
-    
     for course in courses:
         course_dict = dict(course)
-        
-        # Get offerings for this course
-        offerings = await db.fetch(
-            """SELECT co.*, cyc.name as cycle_name, 
-                      t.first_name, t.last_name
-               FROM course_offerings co
-               LEFT JOIN cycles cyc ON co.cycle_id = cyc.id
-               LEFT JOIN teachers t ON co.teacher_id = t.id
-               WHERE co.course_id = $1
-               ORDER BY cyc.start_date DESC, co.group_label""",
-            course['id']
-        )
-        
-        offerings_list = []
-        for offering in offerings:
-            offering_dict = dict(offering)
-            
-            # Get schedules for this offering (like Node.js)
-            schedules = await db.fetch(
-                "SELECT * FROM schedules WHERE course_offering_id = $1",
-                offering['id']
-            )
-            offering_dict['schedules'] = [dict(s) for s in schedules]
-            offerings_list.append(offering_dict)
-        
-        course_dict['offerings'] = offerings_list
+        course_dict['offerings'] = offerings_by_course.get(course['id'], [])
         courses_list.append(course_dict)
-    
+
     return courses_list
 
 async def create_course(data: CourseCreate, db: asyncpg.Connection):
@@ -50,21 +51,40 @@ async def update_course(course_id: int, data: CourseUpdate, db: asyncpg.Connecti
     values = []
     idx = 1
     
-    for field, value in data.dict(exclude_unset=True).items():
+    for field, value in data.model_dump(exclude_unset=True).items():
         fields.append(f"{field} = ${idx}")
         values.append(value)
         idx += 1
-    
+
     if not fields:
         return {"message": "No hay campos para actualizar"}
-    
+
     values.append(course_id)
     query = f"UPDATE courses SET {', '.join(fields)} WHERE id = ${idx}"
-    await db.execute(query, *values)
+    result = await db.execute(query, *values)
+
+    # Verificar que el curso realmente existía (mismo criterio que delete_course)
+    if int(result.split()[-1]) == 0:
+        raise HTTPException(status_code=404, detail="Curso no encontrado")
+
     return {"message": "Curso actualizado correctamente"}
 
 async def delete_course(course_id: int, db: asyncpg.Connection):
-    await db.execute("DELETE FROM courses WHERE id = $1", course_id)
+    # BG-C4: no permitir borrar un curso con ofertas asociadas
+    offerings = await db.fetchval(
+        "SELECT COUNT(*) FROM course_offerings WHERE course_id = $1", course_id
+    )
+    if offerings and offerings > 0:
+        raise HTTPException(
+            status_code=409,
+            detail=f"No se puede eliminar: el curso tiene {offerings} oferta(s) asociada(s)"
+        )
+
+    # BG-C2: verificar que el curso realmente existía
+    result = await db.execute("DELETE FROM courses WHERE id = $1", course_id)
+    if int(result.split()[-1]) == 0:
+        raise HTTPException(status_code=404, detail="Curso no encontrado")
+
     return {"message": "Curso eliminado correctamente"}
 
 async def get_course_offerings(cycle_id: int, db: asyncpg.Connection):
@@ -95,19 +115,38 @@ async def update_course_offering(offering_id: int, data: CourseOfferingUpdate, d
     values = []
     idx = 1
     
-    for field, value in data.dict(exclude_unset=True).items():
+    for field, value in data.model_dump(exclude_unset=True).items():
         fields.append(f"{field} = ${idx}")
         values.append(value)
         idx += 1
-    
+
     if not fields:
         return {"message": "No hay campos para actualizar"}
-    
+
     values.append(offering_id)
     query = f"UPDATE course_offerings SET {', '.join(fields)} WHERE id = ${idx}"
-    await db.execute(query, *values)
+    result = await db.execute(query, *values)
+
+    # Verificar que la oferta realmente existía
+    if int(result.split()[-1]) == 0:
+        raise HTTPException(status_code=404, detail="Oferta no encontrada")
+
     return {"message": "Oferta actualizada correctamente"}
 
 async def delete_course_offering(offering_id: int, db: asyncpg.Connection):
-    await db.execute("DELETE FROM course_offerings WHERE id = $1", offering_id)
+    # BG-C4: no permitir borrar una oferta con estudiantes matriculados
+    enrollments = await db.fetchval(
+        "SELECT COUNT(*) FROM enrollments WHERE course_offering_id = $1", offering_id
+    )
+    if enrollments and enrollments > 0:
+        raise HTTPException(
+            status_code=409,
+            detail=f"No se puede eliminar: la oferta tiene {enrollments} matrícula(s) asociada(s)"
+        )
+
+    # BG-C2: verificar que la oferta realmente existía
+    result = await db.execute("DELETE FROM course_offerings WHERE id = $1", offering_id)
+    if int(result.split()[-1]) == 0:
+        raise HTTPException(status_code=404, detail="Oferta no encontrada")
+
     return {"message": "Oferta eliminada correctamente"}

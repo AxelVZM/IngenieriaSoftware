@@ -28,24 +28,89 @@ function clearSession() {
   localStorage.removeItem("user");
 }
 
-function extraerMensaje(data, response) {
+// Pydantic emite sus mensajes propios en inglés; se traducen los que pueden
+// aparecer en los formularios. Los de nuestros validadores ya vienen en español.
+const MENSAJES_PYDANTIC = [
+  [/^Field required$/i, 'Campo obligatorio'],
+  [/^Input should be a valid number/i, 'Debe ser un número válido'],
+  [/^Input should be a valid integer/i, 'Debe ser un número entero válido'],
+  [/^Input should be a valid date/i, 'Debe ser una fecha válida (AAAA-MM-DD)'],
+  [/^Input should be a valid string/i, 'Debe ser un texto válido'],
+];
+
+// Nombres de campo legibles; si un campo no está aquí se muestra tal cual.
+const ETIQUETAS_CAMPO = {
+  name: 'Nombre',
+  description: 'Descripción',
+  base_price: 'Precio base',
+  start_date: 'Fecha de inicio',
+  end_date: 'Fecha de fin',
+  duration_months: 'Duración en meses',
+  status: 'Estado',
+  group_label: 'Grupo',
+  capacity: 'Capacidad',
+  teacher_id: 'Docente',
+  price_override: 'Precio de la oferta',
+  course_id: 'Curso',
+  cycle_id: 'Ciclo',
+};
+
+/**
+ * Traduce un mensaje de Pydantic. Devuelve además si era genérico: los
+ * mensajes genéricos ("Campo obligatorio") necesitan que se les anteponga el
+ * campo, mientras que los de nuestros validadores ya lo nombran por sí solos.
+ */
+function traducirMensaje(msg) {
+  for (const [patron, traduccion] of MENSAJES_PYDANTIC) {
+    if (patron.test(msg)) return { texto: traduccion, generico: true };
+  }
+  return { texto: msg, generico: false };
+}
+
+/**
+ * Convierte el cuerpo de error de la API en un texto legible.
+ *
+ * En un 422 de validación, FastAPI devuelve `detail` como un ARREGLO de objetos
+ * ({loc, msg, type}, ...). Pasar eso a `new Error(...)` producía el mensaje
+ * "[object Object]". Aquí se aplanan los mensajes y se les antepone el campo.
+ */
+function extractErrorMessage(data, response) {
   if (!data) {
     return response?.status >= 500
       ? "El servidor no está disponible. Inténtalo de nuevo en unos minutos."
       : "No se pudo completar la operación.";
   }
 
-  const detalle = data.detail ?? data.error ?? data.message;
+  const detail = data?.detail ?? data?.message ?? data?.error;
 
-  if (Array.isArray(detalle)) {
-    return detalle
-      .map((d) => (typeof d === "string" ? d : d.msg || JSON.stringify(d)))
-      .join(". ");
+  if (typeof detail === 'string') return detail;
+
+  if (Array.isArray(detail)) {
+    const mensajes = detail
+      .map((item) => {
+        if (typeof item === 'string') return item;
+
+        const crudo = String(item?.msg ?? '').replace(/^Value error,\s*/i, '');
+        if (!crudo) return '';
+        const { texto, generico } = traducirMensaje(crudo);
+
+        const campo = Array.isArray(item?.loc)
+          ? item.loc.filter((p) => p !== 'body' && typeof p === 'string').pop()
+          : null;
+
+        if (!campo || !generico) return texto;
+        return `${ETIQUETAS_CAMPO[campo] ?? campo}: ${texto}`;
+      })
+      .filter(Boolean);
+
+    if (mensajes.length) return mensajes.join(' · ');
   }
-  if (detalle && typeof detalle === "object") {
-    return detalle.msg || detalle.message || JSON.stringify(detalle);
+
+  if (detail && typeof detail === 'object') {
+    return detail.msg || detail.message || JSON.stringify(detail);
   }
-  return detalle || "No se pudo completar la operación.";
+
+  return 'No se pudo completar la operación.';
 }
 
 /**
@@ -64,7 +129,7 @@ function parseErrorBody(body, status, response) {
     });
   }
 
-  const message = extraerMensaje(body, response);
+  const message = extractErrorMessage(body, response);
   return new ApiError(message, { code: "HTTP_ERROR", status });
 }
 

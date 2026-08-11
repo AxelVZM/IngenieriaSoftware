@@ -170,7 +170,14 @@ const AdminLayout = () => {
         sx={{
           flexGrow: 1,
           p: 3,
-          width: { md: `calc(100% - ${drawerWidth}px)` },
+          // Un flex item usa min-width:auto, así que se niega a encogerse por
+          // debajo del ancho intrínseco de su contenido. Como las tablas tienen
+          // min-width:650px, sin este minWidth:0 el área principal se ensancha
+          // más que la pantalla y desborda TODO el layout (se cortan la barra
+          // superior y los botones). Con 0 puede encogerse y el scroll queda
+          // dentro de cada tabla, que es donde corresponde.
+          minWidth: 0,
+          width: { xs: '100%', md: `calc(100% - ${drawerWidth}px)` },
           mt: 8,
         }}
       >

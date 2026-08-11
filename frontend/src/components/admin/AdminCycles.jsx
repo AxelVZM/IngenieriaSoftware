@@ -25,6 +25,7 @@ import { cyclesAPI } from '../../services/api';
 import './admin-dashboard.css';
 import { useDialog } from '../../hooks/useDialog';
 import DialogWrapper from '../common/DialogWrapper';
+import { formatDateOnly } from '../../utils/formatters';
 
 const AdminCycles = () => {
   const [cycles, setCycles] = useState([]);
@@ -160,7 +161,7 @@ const AdminCycles = () => {
         </Button>
       </Box>
 
-      <TableContainer component={Paper} className="admin-table-container">
+      <TableContainer component={Paper} className="admin-table-container" sx={{ overflowX: 'auto' }}>
         <Table className="admin-table">
           <TableHead className="admin-table-head">
             <TableRow>
@@ -176,8 +177,8 @@ const AdminCycles = () => {
             {cycles.map((cycle) => (
               <TableRow key={cycle.id} className="admin-table-row">
                 <TableCell className="admin-table-cell">{cycle.name}</TableCell>
-                <TableCell className="admin-table-cell">{new Date(cycle.start_date).toLocaleDateString()}</TableCell>
-                <TableCell className="admin-table-cell">{new Date(cycle.end_date).toLocaleDateString()}</TableCell>
+                <TableCell className="admin-table-cell">{formatDateOnly(cycle.start_date)}</TableCell>
+                <TableCell className="admin-table-cell">{formatDateOnly(cycle.end_date)}</TableCell>
                 <TableCell className="admin-table-cell">{cycle.duration_months || '-'}</TableCell>
                 <TableCell className="admin-table-cell">
                   <Chip
