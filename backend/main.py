@@ -11,6 +11,7 @@ Cambios respecto a la version revisada:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -158,6 +159,21 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 async def db_exception_handler(request: Request, exc: asyncpg.PostgresError):
     """Cualquier error de PostgreSQL no capturado antes se vuelve un 503."""
     logger.exception("Error de base de datos no controlado en %s", request.url.path)
+    return JSONResponse(
+        status_code=503,
+        content=_error_body("DB_UNAVAILABLE", DB_UNAVAILABLE_MESSAGE),
+    )
+
+
+@app.exception_handler(asyncio.TimeoutError)
+async def db_pool_timeout_handler(request: Request, exc: asyncio.TimeoutError):
+    """
+    DEF-07: se agotaron las conexiones del pool y `pool.acquire()` superó su
+    tiempo máximo de espera (config/database.py). Es la misma situación que
+    el handler de arriba, solo que el fallo ocurre ANTES de llegar a hablar
+    con Postgres, así que asyncpg no lo reporta como PostgresError.
+    """
+    logger.exception("Pool de BD agotado (timeout) en %s", request.url.path)
     return JSONResponse(
         status_code=503,
         content=_error_body("DB_UNAVAILABLE", DB_UNAVAILABLE_MESSAGE),

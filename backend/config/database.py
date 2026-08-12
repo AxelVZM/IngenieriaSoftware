@@ -13,6 +13,12 @@ DATABASE_URL = os.getenv(
 
 pool = None
 
+# DEF-07: tiempo maximo de espera por una conexion libre del pool. Sin esto,
+# `pool.acquire()` espera indefinidamente cuando las `max_size` conexiones
+# estan ocupadas: bajo sobrecarga sostenida las peticiones se quedan colgadas
+# en vez de fallar rapido con un 503 (ver tests/test_rendimiento.py, PRF-03).
+ACQUIRE_TIMEOUT_SECONDS = 10
+
 async def get_db_pool():
     global pool
     if pool is None:
@@ -34,5 +40,5 @@ async def close_db_pool():
 
 async def get_db():
     pool = await get_db_pool()
-    async with pool.acquire() as connection:
+    async with pool.acquire(timeout=ACQUIRE_TIMEOUT_SECONDS) as connection:
         yield connection

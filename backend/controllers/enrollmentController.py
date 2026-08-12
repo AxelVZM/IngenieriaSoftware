@@ -560,6 +560,9 @@ async def create_enrollment(student_id: int, data: EnrollmentCreate, db: asyncpg
         return {"error": "Ya tienes una matrícula activa en uno de los cursos o paquetes "
                          "seleccionados. Actualiza la página; es posible que se haya "
                          "registrado desde otra sesión."}
+    except asyncpg.ForeignKeyViolationError:
+        return {"error": "Una de las ofertas seleccionadas ya no está disponible. "
+                         "Actualiza la página e inténtalo de nuevo."}
 
 
 # =====================================================================
@@ -757,6 +760,12 @@ async def delete_enrollment(enrollment_id: int, db: asyncpg.Connection,
     C-10: la versión original ejecutaba el DELETE a ciegas y siempre
     respondía «Matrícula eliminada correctamente», incluso con un id
     inexistente, y borraba matrículas con pagos ya aprobados.
+
+    C-14: toda matrícula tiene, desde el alta, una fila en payment_plans (con
+    su installment) y al menos una en enrollment_status_history — el DELETE
+    de arriba violaba esa clave foránea en prácticamente todos los casos y
+    caía en el 503 genérico de main.py en vez de borrar nada. Ahora se limpian
+    las filas dependientes primero, dentro de una transacción.
     """
     enr = await db.fetchrow("SELECT id, status FROM enrollments WHERE id = $1", enrollment_id)
     if not enr:
@@ -772,5 +781,16 @@ async def delete_enrollment(enrollment_id: int, db: asyncpg.Connection,
         return {"error": "No se puede eliminar una matrícula con pagos aprobados. "
                          "Cámbiala a «Cancelada» para conservar el registro contable."}
 
-    await db.execute("DELETE FROM enrollments WHERE id = $1", enrollment_id)
+    async with db.transaction():
+        await db.execute(
+            """DELETE FROM installments
+                WHERE payment_plan_id IN (
+                    SELECT id FROM payment_plans WHERE enrollment_id = $1
+                )""",
+            enrollment_id,
+        )
+        await db.execute("DELETE FROM payment_plans WHERE enrollment_id = $1", enrollment_id)
+        await db.execute("DELETE FROM enrollment_status_history WHERE enrollment_id = $1", enrollment_id)
+        await db.execute("DELETE FROM enrollments WHERE id = $1", enrollment_id)
+
     return {"message": "Matrícula eliminada correctamente"}

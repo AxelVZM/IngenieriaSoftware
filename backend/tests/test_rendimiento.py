@@ -255,18 +255,26 @@ class PoolSaturable:
         self.en_uso = 0
         self.pico_en_uso = 0
 
-    def acquire(self):
-        return _Adquisicion(self)
+    def acquire(self, *, timeout=None):
+        return _Adquisicion(self, timeout)
 
 
 class _Adquisicion:
-    """Lo que devuelve pool.acquire(): un gestor de contexto asíncrono."""
+    """Lo que devuelve pool.acquire(): un gestor de contexto asíncrono.
 
-    def __init__(self, pool):
+    Replica el `timeout` de asyncpg.Pool.acquire(): si no hay conexión libre
+    antes de que venza, levanta asyncio.TimeoutError sin tomar ninguna.
+    """
+
+    def __init__(self, pool, timeout=None):
         self._pool = pool
+        self._timeout = timeout
 
     async def __aenter__(self):
-        await self._pool._libres.acquire()
+        if self._timeout is not None:
+            await asyncio.wait_for(self._pool._libres.acquire(), timeout=self._timeout)
+        else:
+            await self._pool._libres.acquire()
         self._pool.en_uso += 1
         self._pool.pico_en_uso = max(self._pool.pico_en_uso, self._pool.en_uso)
         return ConexionEspia()
@@ -279,7 +287,13 @@ class _Adquisicion:
 
 @pytest.fixture
 def instalar_pool(monkeypatch):
-    """Reemplaza el pool real por uno saturable, sin tocar la red."""
+    """Reemplaza el pool real por uno saturable, sin tocar la red.
+
+    También reduce ACQUIRE_TIMEOUT_SECONDS a la escala de estas pruebas
+    (DURACION en vez de los ~620 ms reales): de lo contrario el timeout de
+    producción (10 s) nunca se alcanzaría con DURACION=0.05s y las pruebas de
+    sobrecarga tardarían minutos en lugar de fallar rápido.
+    """
 
     def _instalar(max_size=CAPACIDAD):
         pool = PoolSaturable(max_size)
@@ -288,6 +302,7 @@ def instalar_pool(monkeypatch):
             return pool
 
         monkeypatch.setattr(database, "get_db_pool", _get_db_pool)
+        monkeypatch.setattr(database, "ACQUIRE_TIMEOUT_SECONDS", DURACION * 1.5)
         return pool
 
     return _instalar
@@ -296,11 +311,16 @@ def instalar_pool(monkeypatch):
 async def _peticion(duracion=DURACION):
     """
     Simula una petición: pide conexión por la vía real (config.database.get_db),
-    la retiene mientras "consulta" y la libera. Devuelve lo que esperó por ella.
+    la retiene mientras "consulta" y la libera. Devuelve lo que esperó por ella
+    (incluido el caso en que el pool.acquire() vence su timeout: esa espera
+    también es la que sentiría el cliente antes de recibir un 503).
     """
     inicio = time.perf_counter()
     generador = database.get_db()
-    await generador.__anext__()          # aquí se espera si el pool está lleno
+    try:
+        await generador.__anext__()      # aquí se espera si el pool está lleno
+    except asyncio.TimeoutError:
+        return time.perf_counter() - inicio
     espera = time.perf_counter() - inicio
 
     await asyncio.sleep(duracion)
@@ -350,21 +370,15 @@ async def test_la_espera_por_una_conexion_crece_con_la_sobrecarga(instalar_pool)
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="DEF-07: pool.acquire() en database.py:37 no tiene timeout. "
-           "command_timeout=60 cubre la ejecución de la consulta, no la espera "
-           "por una conexión libre, así que bajo sobrecarga sostenida las "
-           "peticiones se encolan sin límite en vez de fallar rápido con 503.",
-)
 async def test_la_sobrecarga_sostenida_no_debe_encolar_sin_limite(instalar_pool):
     """
     Prueba de esfuerzo: 6 veces la capacidad del pool a la vez.
 
-    Degradar de forma controlada sería devolver 503 al superarse un tiempo
-    máximo de espera. Lo que ocurre es que el cliente espera cuanto haga falta:
-    en producción eso son 20 peticiones servidas y el resto colgadas, y el
-    usuario no recibe ni respuesta ni error.
+    DEF-07 (corregido): `pool.acquire()` en config/database.py ahora recibe
+    `timeout=ACQUIRE_TIMEOUT_SECONDS`, así que bajo sobrecarga sostenida la
+    espera por una conexión libre está acotada — quien no consigue conexión a
+    tiempo falla rápido (503, DB_UNAVAILABLE) en vez de quedar colgado sin
+    respuesta.
     """
     instalar_pool()
     limite_aceptable = DURACION * 2
