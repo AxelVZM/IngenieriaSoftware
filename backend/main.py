@@ -80,8 +80,13 @@ allowed_origins = [
 
 frontend_url = os.getenv("FRONTEND_URL")
 if frontend_url:
-    frontend_url = frontend_url.strip()
-    allowed_origins.append(frontend_url.rstrip("/"))
+    # Admite varias URLs separadas por coma (ej. varios despliegues del
+    # mismo frontend en distintos entornos) en vez de una sola fija.
+    allowed_origins.extend(
+        origen.strip().rstrip("/")
+        for origen in frontend_url.split(",")
+        if origen.strip()
+    )
 
 app.add_middleware(
     CORSMiddleware,
