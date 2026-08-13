@@ -267,6 +267,21 @@ const Login = () => {
     setIsActive(params.get("mode") === "register");
   }, [location]);
 
+  // Muestra en pantalla el motivo exacto (401/403, con su código y mensaje
+  // del backend) por el que api.js redirigió aquí, en vez de dejar al
+  // usuario en el formulario de acceso sin ninguna explicación.
+  useEffect(() => {
+    const guardado = sessionStorage.getItem("authRedirectError");
+    if (!guardado) return;
+    sessionStorage.removeItem("authRedirectError");
+    try {
+      const { status, code, message } = JSON.parse(guardado);
+      showNotification("error", `Sesión cerrada (Error ${status} · ${code})`, message);
+    } catch {
+      // guardado corrupto: se ignora, no bloquea el login normal
+    }
+  }, []);
+
   // La tecla Escape cierra el modal de términos, como espera cualquier usuario
   // acostumbrado a diálogos modales (defecto UX-03). Equivale a "No acepto":
   // no se crea ninguna cuenta.

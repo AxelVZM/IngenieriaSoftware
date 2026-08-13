@@ -209,6 +209,15 @@ function formatearErroresDeValidacion(errores) {
  *  - Formato nuevo: { detail: { code, message, fields, errors } }
  *  - Formato antiguo: { detail: "texto" } o { error: "texto" }
  */
+// 401 = no hay sesión (o ya no sirve); 403 = hay sesión pero el rol no
+// alcanza. Se antepone el código a estos dos porque son la fuente más común
+// de confusión al probar el sistema ("¿por qué no me deja entrar?"); para el
+// resto de errores (422, 409, 503...) el mensaje ya es suficientemente claro
+// por sí solo y anteponer el número no aporta nada al usuario final.
+function conCodigoDeAcceso(mensaje, status) {
+  return status === 401 || status === 403 ? `[Error ${status}] ${mensaje}` : mensaje;
+}
+
 function parseErrorBody(body, status, response) {
   const detail = body?.detail;
 
@@ -221,7 +230,7 @@ function parseErrorBody(body, status, response) {
       detail.message ||
       "Error en la petición";
 
-    return new ApiError(mensaje, {
+    return new ApiError(conCodigoDeAcceso(mensaje, status), {
       code: detail.code || "HTTP_ERROR",
       status,
       fields: detail.fields || [],
@@ -229,7 +238,7 @@ function parseErrorBody(body, status, response) {
   }
 
   const message = extractErrorMessage(body, response);
-  return new ApiError(message, { code: "HTTP_ERROR", status });
+  return new ApiError(conCodigoDeAcceso(message, status), { code: "HTTP_ERROR", status });
 }
 
 // Función helper para hacer peticiones
@@ -294,10 +303,18 @@ async function request(endpoint, options = {}) {
 
     const error = parseErrorBody(body, response.status, response);
 
-    // Sesión inválida o expirada: limpiar y mandar al login
+    // Sesión inválida o expirada: limpiar y mandar al login.
+    // El mensaje se guarda aparte porque window.location.href recarga la
+    // página entera: el "throw error" de más abajo nunca llega a ningún
+    // componente React que lo pueda mostrar, así que sin esto el usuario
+    // caía en /login sin ninguna explicación de qué pasó.
     if (response.status === 401 && (SESSION_ERROR_CODES.includes(error.code) || error.code === "HTTP_ERROR")) {
       clearSession();
       if (!window.location.pathname.startsWith("/login")) {
+        sessionStorage.setItem(
+          "authRedirectError",
+          JSON.stringify({ status: response.status, code: error.code, message: error.message })
+        );
         window.location.href = "/login?expirada=1";
       }
     }
