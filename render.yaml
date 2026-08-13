@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: academia-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+
+  - type: web
+    name: academia-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      # SPA: cualquier ruta que no sea un archivo estatico real cae en
+      # index.html, para que React Router la resuelva en el navegador.
+      # Sin esto, entrar directo a /login o recargar en cualquier ruta
+      # que no sea "/" devuelve 404 (el 404 fisico de Render, no el de la app).
+      - type: rewrite
+        source: /*
+        destination: /index.html
