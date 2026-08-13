@@ -116,6 +116,8 @@ const StudentMyEnrollments = () => {
         return "Rechazado";
       case "cancelado":
         return "Cancelado";
+      case "finalizado":
+        return "Finalizado";
       default:
         return status;
     }
@@ -355,6 +357,28 @@ const StudentMyEnrollments = () => {
                         Cursos incluidos: {enrollment.package_courses_summary}
                       </Typography>
                     )}
+                  {enrollment.status === "finalizado" && (
+                    <Alert
+                      severity={enrollment.finalizado_anticipadamente ? "warning" : "info"}
+                      sx={{ mt: 2 }}
+                    >
+                      {enrollment.finalizado_anticipadamente ? (
+                        <>
+                          <strong>Baja anticipada.</strong> Se finalizó esta matrícula
+                          antes de que terminara el ciclo.
+                          {enrollment.finalization_reason && (
+                            <> Motivo: {enrollment.finalization_reason}</>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          Esta matrícula se finalizó porque el ciclo llegó a su fecha de
+                          término.
+                        </>
+                      )}
+                    </Alert>
+                  )}
+
                   <Typography className="student-price" sx={{ mt: 2 }}>
                     S/. {parseFloat(enrollment.item_price || 0).toFixed(2)}
                   </Typography>

@@ -141,10 +141,14 @@ const AdminEnrollmentsComplete = () => {
     if (!dialogoEstado) return;
     const { matricula, destino } = dialogoEstado;
 
-    // F-07: el motivo es obligatorio al rechazar o cancelar (RF21).
-    const exigeMotivo = destino === 'rechazado' || destino === 'cancelado';
+    // F-07: el motivo es obligatorio al rechazar, cancelar o finalizar (RF21).
+    // Finalizar antes de que termine el ciclo ("baja anticipada") ya no se
+    // bloquea por fecha, pero exige motivo siempre — sin excepción, ni
+    // siquiera si el ciclo ya terminó — porque el estudiante lo va a ver
+    // reflejado en sus matrículas.
+    const exigeMotivo = destino === 'rechazado' || destino === 'cancelado' || destino === 'finalizado';
     if (exigeMotivo && !motivo.trim()) {
-      setError('Indica el motivo para que el estudiante sepa qué debe corregir.');
+      setError('Indica el motivo: el estudiante lo va a ver en su panel.');
       return;
     }
 
@@ -395,9 +399,32 @@ const AdminEnrollmentsComplete = () => {
                 {dialogoEstado.matricula.enrollment_type === 'package' &&
                   ' · Los cursos incluidos en el paquete cambiarán junto con él.'}
               </DialogContentText>
+
+              {dialogoEstado.destino === 'finalizado' && (() => {
+                const finCiclo = dialogoEstado.matricula.cycle_end_date;
+                const noHaTerminado = finCiclo && new Date(finCiclo) > new Date();
+                return noHaTerminado ? (
+                  <Alert severity="warning" sx={{ mb: 2 }}>
+                    El ciclo todavía no ha terminado (termina el{' '}
+                    {new Date(finCiclo).toLocaleDateString('es-PE', { timeZone: 'UTC' })}).
+                    Puedes finalizar la matrícula de todas formas — es una <strong>baja
+                    anticipada</strong> — pero el motivo es obligatorio y el estudiante lo
+                    va a ver en su panel.
+                  </Alert>
+                ) : (
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    {finCiclo
+                      ? `El ciclo ya llegó a su fecha de fin (${new Date(finCiclo).toLocaleDateString('es-PE', { timeZone: 'UTC' })}).`
+                      : 'Esta oferta no tiene un ciclo con fecha de fin registrada.'}
+                  </Alert>
+                );
+              })()}
+
               <TextField
                 label={
-                  dialogoEstado.destino === 'rechazado' || dialogoEstado.destino === 'cancelado'
+                  dialogoEstado.destino === 'rechazado' ||
+                  dialogoEstado.destino === 'cancelado' ||
+                  dialogoEstado.destino === 'finalizado'
                     ? 'Motivo (obligatorio)'
                     : 'Observación (opcional)'
                 }

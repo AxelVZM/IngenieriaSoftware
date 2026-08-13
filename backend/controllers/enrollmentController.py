@@ -253,6 +253,11 @@ async def get_student_enrollments(student_id: int, db: asyncpg.Connection):
                   pp.total_amount,
                   pp.installments AS total_installments,
                   (
+                    SELECT reason FROM enrollment_status_history
+                     WHERE enrollment_id = e.id AND new_status = 'finalizado'
+                     ORDER BY changed_at DESC LIMIT 1
+                  ) AS finalization_reason,
+                  (
                     SELECT STRING_AGG(
                              c2.name ||
                              CASE WHEN co2.group_label IS NOT NULL
@@ -287,6 +292,16 @@ async def get_student_enrollments(student_id: int, db: asyncpg.Connection):
             d["status_label"] = ETIQUETAS_ESTADO[EnrollmentStatus(d["status"])]
         except ValueError:
             d["status_label"] = d["status"]
+
+        # El estudiante necesita distinguir "termine el ciclo con normalidad"
+        # de "me dieron de baja antes de tiempo": la fecha de finalizacion
+        # frente a la fecha de fin del ciclo es lo que marca la diferencia,
+        # no si hay o no un motivo (uno siempre existe, es obligatorio).
+        if d["status"] == "finalizado" and d.get("finalized_at") and d.get("cycle_end_date"):
+            fecha_fin = d["finalized_at"].date() if hasattr(d["finalized_at"], "date") else d["finalized_at"]
+            d["finalizado_anticipadamente"] = fecha_fin < d["cycle_end_date"]
+        else:
+            d["finalizado_anticipadamente"] = None
 
         if d.get("payment_plan_id"):
             cuotas = await db.fetch(
@@ -350,6 +365,7 @@ async def get_admin_enrollments(db: asyncpg.Connection):
                   COALESCE(c.name, p.name) AS item_name,
                   COALESCE(co.group_label, po.group_label) AS group_label,
                   cyc.name AS cycle_name,
+                  cyc.end_date AS cycle_end_date,
                   pp.id AS payment_plan_id,
                   pp.total_amount,
                   i.id           AS installment_id,
@@ -673,8 +689,9 @@ async def update_enrollment_status(
             return {"error": f"No se puede pasar de «{ETIQUETAS_ESTADO[actual]}» a "
                              f"«{ETIQUETAS_ESTADO[nuevo]}». Transiciones permitidas: {opciones}."}
 
-        if nuevo in (EnrollmentStatus.RECHAZADO, EnrollmentStatus.CANCELADO) and not data.reason:
-            return {"error": "Debes indicar el motivo al rechazar o cancelar una matrícula."}
+        if nuevo in (EnrollmentStatus.RECHAZADO, EnrollmentStatus.CANCELADO, EnrollmentStatus.FINALIZADO) \
+                and not data.reason:
+            return {"error": "Debes indicar el motivo al rechazar, cancelar o finalizar una matrícula."}
 
         # Aceptar exige el pago íntegro (regla ya existente, ahora explícita)
         if nuevo == EnrollmentStatus.ACEPTADO:
@@ -703,7 +720,14 @@ async def update_enrollment_status(
                                    f"{resultado['cursos_afectados']} curso(s) del paquete."}
             return {"message": "Matrícula aceptada."}
 
-        # Finalizar exige haber estado aceptada y que el ciclo haya terminado
+        # Finalizar: se permite en cualquier momento (antes el ciclo tenia que
+        # haber terminado y si no, se bloqueaba). Ahora una baja anticipada es
+        # valida siempre que el admin indique el motivo (ya exigido arriba);
+        # aqui solo se determina si fue anticipada o no, para avisarlo en la
+        # respuesta y para que el estudiante lo vea despues en sus matriculas
+        # (get_student_enrollments calcula "finalizado_anticipadamente"
+        # comparando finalized_at contra cycle_end_date).
+        finalizado_anticipadamente = False
         if nuevo == EnrollmentStatus.FINALIZADO:
             ciclo = await db.fetchrow(
                 """SELECT cyc.end_date
@@ -715,9 +739,7 @@ async def update_enrollment_status(
                 data.enrollment_id,
             )
             if ciclo and ciclo["end_date"] and ciclo["end_date"] > date.today():
-                return {"error": f"El ciclo termina el "
-                                 f"{ciclo['end_date'].strftime('%d/%m/%Y')}; "
-                                 f"la matrícula no puede finalizarse antes de esa fecha."}
+                finalizado_anticipadamente = True
 
         columna_fecha = {
             EnrollmentStatus.RECHAZADO: "rejected_at",
@@ -749,6 +771,8 @@ async def update_enrollment_status(
             )
 
         mensaje = f"Matrícula marcada como «{ETIQUETAS_ESTADO[nuevo]}»."
+        if finalizado_anticipadamente:
+            mensaje += " Se finalizó antes de que termine el ciclo; el motivo quedó registrado y visible para el estudiante."
         if propagadas:
             mensaje += f" Se actualizaron también {propagadas} curso(s) del paquete."
         return {"message": mensaje}
